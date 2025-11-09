@@ -11,7 +11,7 @@ async function setupDatabase() {
         database: process.env.DB_NAME || 'project_exponent',
         max: 20,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 30000, // Increased timeout
+        connectionTimeoutMillis: 30000,
     });
 
     let retries = 5;
@@ -20,15 +20,12 @@ async function setupDatabase() {
         try {
             console.log(`📡 Connecting to database (attempt ${6 - retries}/5)...`);
             
-            // Test connection
             await pool.query('SELECT NOW()');
             console.log('✅ Database connection successful');
 
-            // Enable UUID extension
             await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
             console.log('✅ UUID extension enabled');
 
-            // Create games table
             await pool.query(`
                 CREATE TABLE IF NOT EXISTS games (
                     id SERIAL PRIMARY KEY,
@@ -47,7 +44,6 @@ async function setupDatabase() {
             `);
             console.log('✅ Games table verified');
 
-            // Create indexes
             await pool.query(`
                 CREATE INDEX IF NOT EXISTS idx_games_created_at 
                 ON games(created_at DESC)
@@ -59,7 +55,6 @@ async function setupDatabase() {
             `);
             console.log('✅ Indexes verified');
 
-            // Check if we have any games
             const result = await pool.query('SELECT COUNT(*) FROM games');
             console.log(`📊 Database ready with ${result.rows[0].count} games`);
 
@@ -83,7 +78,6 @@ async function setupDatabase() {
     }
 }
 
-// Run if this script is executed directly
 if (require.main === module) {
     setupDatabase().then(success => {
         process.exit(success ? 0 : 1);

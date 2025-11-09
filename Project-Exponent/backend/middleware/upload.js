@@ -2,11 +2,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs-extra');
 
-// Create temp directory if it doesn't exist
 const tempDir = path.join(__dirname, '..', 'temp', 'uploads');
 fs.ensureDirSync(tempDir);
 
-// Use disk storage instead of memory storage for large files
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         cb(null, tempDir);
@@ -17,7 +15,6 @@ const storage = multer.diskStorage({
     }
 });
 
-// File filter function
 const fileFilter = (req, file, cb) => {
     try {
         if (file.fieldname === 'thumbnail') {
@@ -44,12 +41,11 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-// Configure multer with disk storage
 const upload = multer({
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 500 * 1024 * 1024, // 500MB
+        fileSize: 500 * 1024 * 1024, 
         files: 2
     }
 });

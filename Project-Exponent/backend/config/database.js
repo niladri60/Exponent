@@ -16,20 +16,18 @@ const pool = new Pool({
 
 // Test connection on startup
 pool.on('connect', () => {
-    console.log('✅ Connected to PostgreSQL database');
+    console.log('Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {
-    console.error('❌ PostgreSQL pool error:', err);
+    console.error('PostgreSQL pool error:', err);
     process.exit(-1);
 });
 
-// Helper function for queries
 const query = (text, params) => {
     return pool.query(text, params);
 };
 
-// Helper function for transactions
 const transaction = async (callback) => {
     const client = await pool.connect();
     try {

@@ -8,16 +8,12 @@ const path = require('path');
 const fs = require('fs-extra');
 require('dotenv').config();
 
-// Import routes
 const gameRoutes = require('./routes/games');
-
-// Import middleware
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 app.timeout = 300000;
 
-// Ensure required directories exist
 async function ensureDirectories() {
     const directories = [
         'public/thumbnails',
@@ -30,7 +26,6 @@ async function ensureDirectories() {
     }
 }
 
-// Initialize directories
 ensureDirectories().then(() => {
     console.log('Required directories initialized');
 }).catch(console.error);
@@ -43,7 +38,7 @@ app.use(helmet({
             scriptSrc: [
                 "'self'", 
                 "'unsafe-eval'", 
-                "'unsafe-inline'",  // Allow inline scripts for Unity
+                "'unsafe-inline'",  
                 "blob:",
                 "cdnjs.cloudflare.com",
                 "unpkg.com",
@@ -51,41 +46,38 @@ app.use(helmet({
             ],
             styleSrc: [
                 "'self'", 
-                "'unsafe-inline'",   // Allow inline styles for Unity
+                "'unsafe-inline'",   
                 "fonts.googleapis.com"
             ],
             fontSrc: [
                 "'self'", 
                 "fonts.gstatic.com",
-                "data:"              // Allow data URLs for fonts
+                "data:"              
             ],
             imgSrc: [
                 "'self'", 
                 "data:", 
                 "blob:",
-                "*"                  // Allow images from any source (Unity may load from various sources)
+                "*"                  
             ],
             connectSrc: [
                 "'self'", 
                 "blob:",
                 "data:",
-                "*"                  // Allow connections to any source for Unity WebGL
+                "*"                  
             ],
             mediaSrc: ["'self'"],
             objectSrc: ["'none'"],
-            workerSrc: ["blob:"],    // Allow blob workers for Unity
-            childSrc: ["blob:"]      // Allow blob child frames
+            workerSrc: ["blob:"],    
+            childSrc: ["blob:"]      
         }
     },
-    crossOriginEmbedderPolicy: false, // Disable for Unity WebGL compatibility
-    crossOriginOpenerPolicy: false,   // Disable for Unity WebGL compatibility
-    crossOriginResourcePolicy: { policy: "cross-origin" } // Allow cross-origin resources
+    crossOriginEmbedderPolicy: false, 
+    crossOriginOpenerPolicy: false,   
+    crossOriginResourcePolicy: { policy: "cross-origin" } 
 }));
 
-// Compression middleware
 app.use(compression());
-
-// Rate limiting
 const limiter = rateLimit({
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
@@ -96,7 +88,6 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
 app.use(cors({
     origin: process.env.CLIENT_URL || 'http://localhost:3000',
     credentials: true,
@@ -104,17 +95,14 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Logging middleware
 app.use(morgan('combined'));
 
-// Body parsing middleware with increased limits for file uploads
 app.use(express.json({ limit: process.env.MAX_FILE_SIZE || '500mb' }));
 app.use(express.urlencoded({ 
     extended: true, 
     limit: process.env.MAX_FILE_SIZE || '500mb' 
 }));
 
-// Static files serving
 app.use('/thumbnails', express.static(path.join(__dirname, 'public', 'thumbnails'), {
     maxAge: '1d',
     setHeaders: (res, filePath) => {
@@ -135,9 +123,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
 }));
 
-// Add specific MIME types for Unity WebGL files
 app.use('/games', (req, res, next) => {
-    // Set correct MIME types for Unity WebGL files
     if (req.path.endsWith('.wasm')) {
         res.set('Content-Type', 'application/wasm');
     } else if (req.path.endsWith('.data')) {
@@ -149,11 +135,9 @@ app.use('/games', (req, res, next) => {
 }, express.static(path.join(__dirname, 'public', 'games'), {
     maxAge: '7d',
     setHeaders: (res, filePath) => {
-        // No-cache for HTML files
         if (filePath.endsWith('.html')) {
             res.set('Cache-Control', 'no-cache');
         }
-        // Long cache for assets
         else if (filePath.endsWith('.wasm') || filePath.endsWith('.js') || filePath.endsWith('.data')) {
             res.set('Cache-Control', 'public, max-age=31536000'); // 1 year
         }
@@ -184,7 +168,6 @@ app.get('/', (req, res) => {
     });
 });
 
-// Multer error handling middleware
 app.use((error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({
@@ -215,7 +198,6 @@ app.use((error, req, res, next) => {
     next(error);
 });
 
-// 404 handler - SIMPLIFIED - remove the problematic route pattern
 app.use((req, res, next) => {
     if (req.path.startsWith('/api/') && req.path !== '/api/games') {
         return res.status(404).json({
@@ -233,8 +215,6 @@ app.use((req, res) => {
         message: 'Route not found'
     });
 });
-
-// Error handling middleware (should be last)
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
