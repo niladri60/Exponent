@@ -19,4 +19,4 @@ RUN mkdir -p uploads
 EXPOSE 3000
 
 # Start the application
-CMD ["npm", "start"]
+CMD ["sh", "-c", "node scripts/setupDatabase.js && npm start"]
