@@ -40,16 +40,44 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-eval'", "blob:", "cdnjs.cloudflare.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
-            fontSrc: ["'self'", "fonts.gstatic.com"],
-            imgSrc: ["'self'", "data:", "blob:"],
-            connectSrc: ["'self'", "blob:"],
+            scriptSrc: [
+                "'self'", 
+                "'unsafe-eval'", 
+                "'unsafe-inline'",  // Allow inline scripts for Unity
+                "blob:",
+                "cdnjs.cloudflare.com"
+            ],
+            styleSrc: [
+                "'self'", 
+                "'unsafe-inline'",   // Allow inline styles for Unity
+                "fonts.googleapis.com"
+            ],
+            fontSrc: [
+                "'self'", 
+                "fonts.gstatic.com",
+                "data:"              // Allow data URLs for fonts
+            ],
+            imgSrc: [
+                "'self'", 
+                "data:", 
+                "blob:",
+                "*"                  // Allow images from any source (Unity may load from various sources)
+            ],
+            connectSrc: [
+                "'self'", 
+                "blob:",
+                "data:",
+                "*"                  // Allow connections to any source for Unity WebGL
+            ],
             mediaSrc: ["'self'"],
-            objectSrc: ["'none'"]
+            objectSrc: ["'none'"],
+            workerSrc: ["blob:"],    // Allow blob workers for Unity
+            childSrc: ["blob:"]      // Allow blob child frames
         }
     },
-    crossOriginEmbedderPolicy: false
+    crossOriginEmbedderPolicy: false, // Disable for Unity WebGL compatibility
+    crossOriginOpenerPolicy: false,   // Disable for Unity WebGL compatibility
+    crossOriginResourcePolicy: { policy: "cross-origin" } // Allow cross-origin resources
 }));
 
 // Compression middleware
@@ -94,13 +122,38 @@ app.use('/thumbnails', express.static(path.join(__dirname, 'public', 'thumbnails
     }
 }));
 
-app.use('/games', express.static(path.join(__dirname, 'public/games'), {
+app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '7d',
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html')) {
             res.set('Cache-Control', 'no-cache');
         } else {
             res.set('Cache-Control', 'public, max-age=604800');
+        }
+    }
+}));
+
+// Add specific MIME types for Unity WebGL files
+app.use('/games', (req, res, next) => {
+    // Set correct MIME types for Unity WebGL files
+    if (req.path.endsWith('.wasm')) {
+        res.set('Content-Type', 'application/wasm');
+    } else if (req.path.endsWith('.data')) {
+        res.set('Content-Type', 'application/octet-stream');
+    } else if (req.path.endsWith('.js')) {
+        res.set('Content-Type', 'application/javascript');
+    }
+    next();
+}, express.static(path.join(__dirname, 'public', 'games'), {
+    maxAge: '7d',
+    setHeaders: (res, filePath) => {
+        // No-cache for HTML files
+        if (filePath.endsWith('.html')) {
+            res.set('Cache-Control', 'no-cache');
+        }
+        // Long cache for assets
+        else if (filePath.endsWith('.wasm') || filePath.endsWith('.js') || filePath.endsWith('.data')) {
+            res.set('Cache-Control', 'public, max-age=31536000'); // 1 year
         }
     }
 }));

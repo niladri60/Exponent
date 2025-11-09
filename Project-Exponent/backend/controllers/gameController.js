@@ -141,17 +141,36 @@ exports.createGame = async (req, res, next) => {
 
 // Serving game
 exports.serveGame = async (req, res, next) => {
-  try {
-    const game = await Game.findById(req.params.id);
-    if (!game) return res.status(404).send('Game not found');
+    try {
+        const game = await Game.findById(req.params.id);
+        if (!game) {
+            return res.status(404).json({
+                success: false,
+                message: 'Game not found'
+            });
+        }
 
-    const redirectPath = path.posix.join(game.game_folder_url, 'index.html');
-    console.log('🎮 Redirecting to:', redirectPath);
-    res.redirect(redirectPath);
+        // Get the actual game folder path
+        const gameFolderPath = path.join(__dirname, '..', 'public', game.game_folder_url);
+        
+        // Check if index.html exists
+        const indexPath = path.join(gameFolderPath, 'index.html');
+        if (!await fs.pathExists(indexPath)) {
+            return res.status(404).json({
+                success: false,
+                message: 'Game index.html not found'
+            });
+        }
 
-  } catch (error) {
-    next(error);
-  }
+        console.log('🎮 Serving game from:', gameFolderPath);
+        
+        // Serve the HTML file directly instead of redirecting
+        res.sendFile(indexPath);
+
+    } catch (error) {
+        console.error('Error serving game:', error);
+        next(error);
+    }
 };
 
 
