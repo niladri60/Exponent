@@ -1,0 +1,52 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - CLIENT_URL=http://localhost:3000
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=your_secure_password
+      - DB_NAME=project_exponent
+      - MAX_FILE_SIZE=504857600
+      - MAX_THUMBNAIL_SIZE=5242880
+      - JWT_SECRET=your_jwt_secret_key
+      - RATE_LIMIT_WINDOW_MS=900000
+      - RATE_LIMIT_MAX_REQUESTS=100
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/usr/src/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      - POSTGRES_DB=project_exponent
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=your_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d project_exponent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:

@@ -7,13 +7,11 @@
     "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' nodemon app.js",
     "start": "node --max-old-space-size=4096 app.js",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "setup-db": "node scripts/setupDatabase.js"
+    "format": "prettier --write ."
   },
   "keywords": [],
   "author": "Niladri Nandy",
   "license": "ISC",
-  "packageManager": "pnpm@10.20.0",
   "dependencies": {
     "archiver": "^7.0.1",
     "compression": "^1.8.1",
@@ -35,7 +33,6 @@
     "nodemon": "^3.1.10"
   },
   "engines": {
-    "node": ">=20.0.0",
-    "pnpm": ">=10.20.0"
+    "node": ">=24.11.0"
   }
 }

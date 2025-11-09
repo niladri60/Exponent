@@ -1,90 +1,93 @@
 const { Pool } = require('pg');
-require('dotenv').config();
 
 async function setupDatabase() {
-    // First connect to default postgres database
-    const adminPool = new Pool({
-        host: process.env.DB_HOST || 'localhost',
+    console.log('🔧 Attempting database setup...');
+    
+    const pool = new Pool({
+        host: process.env.DB_HOST || 'postgres',
         port: parseInt(process.env.DB_PORT) || 5432,
         user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || '',
-        database: 'postgres'
+        password: process.env.DB_PASSWORD || 'postgres',
+        database: process.env.DB_NAME || 'project_exponent',
+        max: 20,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 30000, // Increased timeout
     });
 
-    const dbName = process.env.DB_NAME || 'game_platform';
+    let retries = 5;
+    
+    while (retries > 0) {
+        try {
+            console.log(`📡 Connecting to database (attempt ${6 - retries}/5)...`);
+            
+            // Test connection
+            await pool.query('SELECT NOW()');
+            console.log('✅ Database connection successful');
 
-    try {
-        console.log('🔧 Setting up database...');
+            // Enable UUID extension
+            await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+            console.log('✅ UUID extension enabled');
 
-        // Check if database exists
-        const dbExists = await adminPool.query(
-            "SELECT 1 FROM pg_database WHERE datname = $1",
-            [dbName]
-        );
+            // Create games table
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS games (
+                    id SERIAL PRIMARY KEY,
+                    title VARCHAR(255) NOT NULL CHECK (char_length(title) > 0),
+                    description TEXT,
+                    thumbnail_url VARCHAR(500),
+                    game_folder_url VARCHAR(500) NOT NULL,
+                    original_filename VARCHAR(255) NOT NULL,
+                    file_size BIGINT CHECK (file_size > 0 AND file_size < 104857600),
+                    mime_type VARCHAR(100),
+                    metadata JSONB DEFAULT '{}',
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    is_active BOOLEAN DEFAULT TRUE
+                )
+            `);
+            console.log('✅ Games table verified');
 
-        if (dbExists.rows.length === 0) {
-            console.log('📁 Creating database...');
-            await adminPool.query(`CREATE DATABASE ${dbName}`);
-            console.log('✅ Database created successfully');
-        } else {
-            console.log('✅ Database already exists');
+            // Create indexes
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_games_created_at 
+                ON games(created_at DESC)
+            `);
+
+            await pool.query(`
+                CREATE INDEX IF NOT EXISTS idx_games_active 
+                ON games(is_active) WHERE is_active = true
+            `);
+            console.log('✅ Indexes verified');
+
+            // Check if we have any games
+            const result = await pool.query('SELECT COUNT(*) FROM games');
+            console.log(`📊 Database ready with ${result.rows[0].count} games`);
+
+            await pool.end();
+            console.log('🎉 Database setup completed!');
+            return true;
+
+        } catch (error) {
+            console.log(`❌ Database setup attempt failed: ${error.message}`);
+            retries--;
+            
+            if (retries === 0) {
+                console.log('💡 Database setup failed, but application will continue...');
+                await pool.end().catch(() => {});
+                return false;
+            }
+            
+            console.log(`🔄 Retrying in 5 seconds... (${retries} attempts remaining)`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
-
-        await adminPool.end();
-
-        // Now connect to our database and create tables
-        const dbPool = new Pool({
-            host: process.env.DB_HOST || 'localhost',
-            port: parseInt(process.env.DB_PORT) || 5432,
-            user: process.env.DB_USER || 'postgres',
-            password: process.env.DB_PASSWORD || '',
-            database: dbName
-        });
-
-        // Create games table
-        await dbPool.query(`
-            CREATE TABLE IF NOT EXISTS games (
-                id SERIAL PRIMARY KEY,
-                title VARCHAR(255) NOT NULL CHECK (char_length(title) > 0),
-                description TEXT,
-                thumbnail_url VARCHAR(500),
-                game_folder_url VARCHAR(500) NOT NULL,
-                original_filename VARCHAR(255) NOT NULL,
-                file_size BIGINT CHECK (file_size > 0 AND file_size < 104857600),
-                mime_type VARCHAR(100),
-                metadata JSONB DEFAULT '{}',
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW(),
-                is_active BOOLEAN DEFAULT TRUE
-            )
-        `);
-
-        console.log('✅ Games table created successfully');
-
-        // Create indexes
-        await dbPool.query(`
-            CREATE INDEX IF NOT EXISTS idx_games_created_at 
-            ON games(created_at DESC)
-        `);
-
-        await dbPool.query(`
-            CREATE INDEX IF NOT EXISTS idx_games_active 
-            ON games(is_active) WHERE is_active = true
-        `);
-
-        console.log('✅ Indexes created successfully');
-
-        // Check if table has data
-        const result = await dbPool.query('SELECT COUNT(*) FROM games');
-        console.log(`📊 Games table has ${result.rows[0].count} records`);
-
-        await dbPool.end();
-        console.log('🎉 Database setup completed successfully!');
-
-    } catch (error) {
-        console.error('❌ Database setup failed:', error.message);
-        process.exit(1);
     }
 }
 
-setupDatabase();
+// Run if this script is executed directly
+if (require.main === module) {
+    setupDatabase().then(success => {
+        process.exit(success ? 0 : 1);
+    });
+}
+
+module.exports = setupDatabase;

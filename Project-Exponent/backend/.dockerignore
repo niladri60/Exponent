@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.nyc_output
+coverage
+.tmp
+temp/uploads/*
+public/thumbnails/*
+public/games/*
+!.dockerignore
+Dockerfile
+docker-compose.yml
