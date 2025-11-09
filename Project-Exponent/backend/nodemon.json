@@ -1,0 +1,21 @@
+{
+  "ignore": [
+    "public/thumbnails/**/*",
+    "public/games/**/*", 
+    "temp/uploads/**/*",
+    "*.zip",
+    "*.jpg",
+    "*.png"
+  ],
+  "watch": [
+    "app.js",
+    "config/",
+    "controllers/",
+    "models/", 
+    "routes/",
+    "middleware/",
+    "utils/"
+  ],
+  "ext": "js,json",
+  "exec": "node --max-old-space-size=4096"
+}
