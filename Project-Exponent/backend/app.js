@@ -45,7 +45,9 @@ app.use(helmet({
                 "'unsafe-eval'", 
                 "'unsafe-inline'",  // Allow inline scripts for Unity
                 "blob:",
-                "cdnjs.cloudflare.com"
+                "cdnjs.cloudflare.com",
+                "unpkg.com",
+                "cdn.tailwindcss.com"
             ],
             styleSrc: [
                 "'self'", 

@@ -7,9 +7,8 @@ const extract = require('extract-zip');
 const pipeline = promisify(stream.pipeline);
 
 class FileHandler {
-    /**
-     * Extract game zip file WITHOUT blocking the event loop
-     */
+    
+    // Extract game zip file WITHOUT blocking the event loop
     static async extractGameZip(zipPath, extractPath) {
         return new Promise(async (resolve, reject) => {
             try {
@@ -55,9 +54,7 @@ class FileHandler {
         });
     }
 
-    /**
-     * Handle nested folder structure
-     */
+    // Handle nested folder structure
     static async handleNestedStructure(rootPath) {
         const items = await fs.readdir(rootPath);
         
@@ -80,9 +77,7 @@ class FileHandler {
         }
     }
 
-    /**
-     * Move contents from subdirectory to root
-     */
+    // Move contents from subdirectory to root
     static async moveContentsToRoot(sourceDir, targetDir) {
         const items = await fs.readdir(sourceDir);
         
@@ -100,9 +95,7 @@ class FileHandler {
         await fs.remove(sourceDir);
     }
 
-    /**
-     * Validate game folder structure
-     */
+    // Validate game folder structure
     static async validateGameStructure(folderPath) {
         const absolutePath = path.resolve(folderPath);
         
@@ -115,9 +108,7 @@ class FileHandler {
         return true;
     }
 
-    /**
-     * Delete game folder and all contents
-     */
+    // Delete game folder and all contents
     static async deleteGameFolder(gamePath) {
         try {
             const absolutePath = path.resolve(gamePath);
@@ -131,9 +122,7 @@ class FileHandler {
         }
     }
 
-    /**
-     * Calculate folder size recursively (with progress for large folders)
-     */
+    // Calculate folder size recursively (with progress for large folders)
     static async getFolderSize(folderPath) {
         try {
             const absolutePath = path.resolve(folderPath);

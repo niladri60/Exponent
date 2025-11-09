@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Interactive Periodic Table — Browser App</title>
+
+  <!-- React + ReactDOM via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+  <!-- Tailwind (play CDN) for quick styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* Additional local styles */
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    .cell { min-width: 64px; min-height: 64px; border-radius: 8px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:6px; }
+    .cell-small { min-width:48px; min-height:48px; padding:4px; border-radius:6px; }
+    .category-legend { display:flex; flex-wrap:wrap; gap:8px; }
+    .trend-overlay { opacity:0.9; }
+    .modal-backdrop { background: rgba(0,0,0,0.35); }
+    .timeline-dot { width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<div id="root" class="p-4"></div>
+
+<script>
+/**
+ * Interactive Periodic Table — Single-file client app (React)
+ * - Drop in a full dataset by setting window.ELEMENTS to an array of elements (see sample below)
+ * - Or replace sampleElements with the full JSON.
+ *
+ * Element object shape (required fields used by app):
+ * {
+ *   atomicNumber: 1,
+ *   symbol: "H",
+ *   name: "Hydrogen",
+ *   atomicMass: "1.008",
+ *   group: 1,
+ *   period: 1,
+ *   category: "Nonmetal",
+ *   phase: "Gas",
+ *   color: "color string",
+ *   density: 0.08988,
+ *   meltingPointC: -259.16,
+ *   boilingPointC: -252.87,
+ *   electronConfiguration: "1s1",
+ *   discoveryYear: "1766",
+ *   discoverer: "Henry Cavendish",
+ *   funFacts: ["Lightest element", "Most abundant in the universe"],
+ *   electronegativity: 2.20
+ * }
+ */
+
+/* ---------------------------
+   SAMPLE DATA (10 elements)
+   Replace window.ELEMENTS with a full dataset later
+   --------------------------- */
+// Replace the sampleElements array with this cleaned version (unknown numeric/text values set to null)
+const sampleElements = [
+  { atomicNumber:1, symbol:"H", name:"Hydrogen", atomicMass:"1.008", group:1, period:1, category:"Nonmetal", phase:"Gas", color:"colorless", density:0.08988, meltingPointC:-259.16, boilingPointC:-252.87, electronConfiguration:"1s1", discoveryYear:"1766", discoverer:"Henry Cavendish", funFacts:["Lightest element","Most abundant in universe"], electronegativity:2.20 },
+  { atomicNumber:2, symbol:"He", name:"Helium", atomicMass:"4.002602", group:18, period:1, category:"Noble Gas", phase:"Gas", color:"colorless", density:0.1786, meltingPointC:-272.2, boilingPointC:-268.93, electronConfiguration:"1s2", discoveryYear:"1895", discoverer:"Sir William Ramsay", funFacts:["Second lightest","Used in cryogenics"], electronegativity:null },
+  { atomicNumber:3, symbol:"Li", name:"Lithium", atomicMass:"6.94", group:1, period:2, category:"Alkali Metal", phase:"Solid", color:"silvery-white", density:0.534, meltingPointC:180.54, boilingPointC:1342, electronConfiguration:"[He] 2s1", discoveryYear:"1817", discoverer:"Johan August Arfwedson", funFacts:["Lightest metal","Used in batteries"], electronegativity:0.98 },
+  { atomicNumber:4, symbol:"Be", name:"Beryllium", atomicMass:"9.0121831", group:2, period:2, category:"Alkaline Earth Metal", phase:"Solid", color:"steel-gray", density:1.85, meltingPointC:1287, boilingPointC:2469, electronConfiguration:"[He] 2s2", discoveryYear:"1798", discoverer:"Louis-Nicolas Vauquelin", funFacts:["High stiffness-to-weight ratio","Used in aerospace"], electronegativity:1.57 },
+  { atomicNumber:5, symbol:"B", name:"Boron", atomicMass:"10.81", group:13, period:2, category:"Metalloid", phase:"Solid", color:"black-brown", density:2.34, meltingPointC:2075, boilingPointC:4000, electronConfiguration:"[He] 2s2 2p1", discoveryYear:"1808", discoverer:"Joseph Louis Gay-Lussac / Louis Jacques Thénard / Humphry Davy", funFacts:["Essential to borates and borosilicate glass","Hard and brittle"], electronegativity:2.04 },
+  { atomicNumber:6, symbol:"C", name:"Carbon", atomicMass:"12.011", group:14, period:2, category:"Nonmetal", phase:"Solid", color:"varies", density:2.267, meltingPointC:3550, boilingPointC:4827, electronConfiguration:"[He] 2s2 2p2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Forms allotropes: diamond, graphite","Backbone of organic chemistry"], electronegativity:2.55 },
+  { atomicNumber:7, symbol:"N", name:"Nitrogen", atomicMass:"14.007", group:15, period:2, category:"Nonmetal", phase:"Gas", color:"colorless", density:1.2506, meltingPointC:-210.00, boilingPointC:-195.79, electronConfiguration:"[He] 2s2 2p3", discoveryYear:"1772", discoverer:"Daniel Rutherford", funFacts:["Makes up ~78% of Earth's atmosphere","Essential for amino acids"], electronegativity:3.04 },
+  { atomicNumber:8, symbol:"O", name:"Oxygen", atomicMass:"15.999", group:16, period:2, category:"Nonmetal", phase:"Gas", color:"colorless", density:1.429, meltingPointC:-218.79, boilingPointC:-182.96, electronConfiguration:"[He] 2s2 2p4", discoveryYear:"1774", discoverer:"Joseph Priestley / Carl Wilhelm Scheele", funFacts:["Essential for respiration","Supports combustion"], electronegativity:3.44 },
+  { atomicNumber:9, symbol:"F", name:"Fluorine", atomicMass:"18.998403163", group:17, period:2, category:"Halogen", phase:"Gas", color:"pale yellow", density:1.696, meltingPointC:-219.67, boilingPointC:-188.11, electronConfiguration:"[He] 2s2 2p5", discoveryYear:"1810", discoverer:"Henri Moissan", funFacts:["Most reactive of the elements","Used in fluorides and Teflon synthesis"], electronegativity:3.98 },
+  { atomicNumber:10, symbol:"Ne", name:"Neon", atomicMass:"20.1797", group:18, period:2, category:"Noble Gas", phase:"Gas", color:"colorless", density:0.9002, meltingPointC:-248.59, boilingPointC:-246.08, electronConfiguration:"[He] 2s2 2p6", discoveryYear:"1898", discoverer:"Sir William Ramsay & Morris Travers", funFacts:["Used in neon signage","Inert gas"], electronegativity:null },
+  { atomicNumber:11, symbol:"Na", name:"Sodium", atomicMass:"22.98976928", group:1, period:3, category:"Alkali Metal", phase:"Solid", color:"silvery-white", density:0.971, meltingPointC:97.79, boilingPointC:883, electronConfiguration:"[Ne] 3s1", discoveryYear:"1807", discoverer:"Humphry Davy", funFacts:["Reacts violently with water","Component of table salt (NaCl)"], electronegativity:0.93 },
+  { atomicNumber:12, symbol:"Mg", name:"Magnesium", atomicMass:"24.305", group:2, period:3, category:"Alkaline Earth Metal", phase:"Solid", color:"silvery-white", density:1.738, meltingPointC:650, boilingPointC:1090, electronConfiguration:"[Ne] 3s2", discoveryYear:"1755", discoverer:"Joseph Black", funFacts:["Lightweight structural metal","Burns with bright white flame"], electronegativity:1.31 },
+  { atomicNumber:13, symbol:"Al", name:"Aluminium", atomicMass:"26.9815385", group:13, period:3, category:"Post-transition Metal", phase:"Solid", color:"silvery", density:2.70, meltingPointC:660.32, boilingPointC:2470, electronConfiguration:"[Ne] 3s2 3p1", discoveryYear:"1825", discoverer:"Hans Christian Ørsted", funFacts:["Lightweight, corrosion-resistant","Widely used in packaging and construction"], electronegativity:1.61 },
+  { atomicNumber:14, symbol:"Si", name:"Silicon", atomicMass:"28.085", group:14, period:3, category:"Metalloid", phase:"Solid", color:"gray", density:2.3296, meltingPointC:1414, boilingPointC:3265, electronConfiguration:"[Ne] 3s2 3p2", discoveryYear:"1824", discoverer:"Jöns Jakob Berzelius", funFacts:["Base of semiconductor industry","Forms many minerals"], electronegativity:1.90 },
+  { atomicNumber:15, symbol:"P", name:"Phosphorus", atomicMass:"30.973761998", group:15, period:3, category:"Nonmetal", phase:"Solid", color:"varies", density:1.823, meltingPointC:44.1, boilingPointC:280, electronConfiguration:"[Ne] 3s2 3p3", discoveryYear:"1669", discoverer:"Hennig Brand", funFacts:["Essential nutrient (phosphate)","Many allotropes (white, red)"], electronegativity:2.19 },
+  { atomicNumber:16, symbol:"S", name:"Sulfur", atomicMass:"32.06", group:16, period:3, category:"Nonmetal", phase:"Solid", color:"yellow", density:2.07, meltingPointC:115.21, boilingPointC:444.6, electronConfiguration:"[Ne] 3s2 3p4", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Used in sulfuric acid production","Characteristic odor when burned"], electronegativity:2.58 },
+  { atomicNumber:17, symbol:"Cl", name:"Chlorine", atomicMass:"35.45", group:17, period:3, category:"Halogen", phase:"Gas", color:"greenish-yellow", density:3.214, meltingPointC:-101.5, boilingPointC:-34.04, electronConfiguration:"[Ne] 3s2 3p5", discoveryYear:"1774", discoverer:"Carl Wilhelm Scheele", funFacts:["Used to disinfect water","Toxic as gas"], electronegativity:3.16 },
+  { atomicNumber:18, symbol:"Ar", name:"Argon", atomicMass:"39.948", group:18, period:3, category:"Noble Gas", phase:"Gas", color:"colorless", density:1.7837, meltingPointC:-189.34, boilingPointC:-185.85, electronConfiguration:"[Ne] 3s2 3p6", discoveryYear:"1894", discoverer:"Lord Rayleigh & Sir William Ramsay", funFacts:["Inert gas used in lighting","Makes up ~1% of atmosphere"], electronegativity:null },
+  { atomicNumber:19, symbol:"K", name:"Potassium", atomicMass:"39.0983", group:1, period:4, category:"Alkali Metal", phase:"Solid", color:"silvery-white", density:0.862, meltingPointC:63.5, boilingPointC:759, electronConfiguration:"[Ar] 4s1", discoveryYear:"1807", discoverer:"Humphry Davy", funFacts:["Essential biological electrolyte","Highly reactive"], electronegativity:0.82 },
+  { atomicNumber:20, symbol:"Ca", name:"Calcium", atomicMass:"40.078", group:2, period:4, category:"Alkaline Earth Metal", phase:"Solid", color:"silvery", density:1.54, meltingPointC:842, boilingPointC:1484, electronConfiguration:"[Ar] 4s2", discoveryYear:"1808", discoverer:"Humphry Davy", funFacts:["Major component of bones","Used in cement"], electronegativity:1.00 },
+  { atomicNumber:21, symbol:"Sc", name:"Scandium", atomicMass:"44.955908", group:3, period:4, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:2.985, meltingPointC:1541, boilingPointC:2836, electronConfiguration:"[Ar] 3d1 4s2", discoveryYear:"1879", discoverer:"Lars Fredrik Nilson", funFacts:["Used in aerospace alloys","Rare on Earth"], electronegativity:1.36 },
+  { atomicNumber:22, symbol:"Ti", name:"Titanium", atomicMass:"47.867", group:4, period:4, category:"Transition Metal", phase:"Solid", color:"silvery-gray", density:4.506, meltingPointC:1668, boilingPointC:3287, electronConfiguration:"[Ar] 3d2 4s2", discoveryYear:"1791", discoverer:"William Gregor", funFacts:["High strength-to-weight ratio","Corrosion resistant"], electronegativity:1.54 },
+  { atomicNumber:23, symbol:"V", name:"Vanadium", atomicMass:"50.9415", group:5, period:4, category:"Transition Metal", phase:"Solid", color:"gray-silver", density:6.11, meltingPointC:1910, boilingPointC:3407, electronConfiguration:"[Ar] 3d3 4s2", discoveryYear:"1801", discoverer:"Andrés Manuel del Río", funFacts:["Used in steel alloys","Multiple oxidation states"], electronegativity:1.63 },
+  { atomicNumber:24, symbol:"Cr", name:"Chromium", atomicMass:"51.9961", group:6, period:4, category:"Transition Metal", phase:"Solid", color:"silvery", density:7.19, meltingPointC:1907, boilingPointC:2671, electronConfiguration:"[Ar] 3d5 4s1", discoveryYear:"1797", discoverer:"Louis Nicolas Vauquelin", funFacts:["Used to make stainless steel","Forms colorful compounds"], electronegativity:1.66 },
+  { atomicNumber:25, symbol:"Mn", name:"Manganese", atomicMass:"54.938044", group:7, period:4, category:"Transition Metal", phase:"Solid", color:"gray-white", density:7.21, meltingPointC:1246, boilingPointC:2095, electronConfiguration:"[Ar] 3d5 4s2", discoveryYear:"1774", discoverer:"G. Brandt (isolated later)", funFacts:["Important in steelmaking","Many oxidation states"], electronegativity:1.55 },
+  { atomicNumber:26, symbol:"Fe", name:"Iron", atomicMass:"55.845", group:8, period:4, category:"Transition Metal", phase:"Solid", color:"silvery-gray", density:7.874, meltingPointC:1538, boilingPointC:2862, electronConfiguration:"[Ar] 3d6 4s2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Most used metal by mass","Forms magnetic compounds"], electronegativity:1.83 },
+  { atomicNumber:27, symbol:"Co", name:"Cobalt", atomicMass:"58.933194", group:9, period:4, category:"Transition Metal", phase:"Solid", color:"lustrous gray", density:8.86, meltingPointC:1495, boilingPointC:2927, electronConfiguration:"[Ar] 3d7 4s2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Used in magnets and alloys","Produces vivid blue pigments"], electronegativity:1.88 },
+  { atomicNumber:28, symbol:"Ni", name:"Nickel", atomicMass:"58.6934", group:10, period:4, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:8.908, meltingPointC:1455, boilingPointC:2913, electronConfiguration:"[Ar] 3d8 4s2", discoveryYear:"1751", discoverer:"Axel Fredrik Cronstedt", funFacts:["Corrosion resistant","Used in stainless steel"], electronegativity:1.91 },
+  { atomicNumber:29, symbol:"Cu", name:"Copper", atomicMass:"63.546", group:11, period:4, category:"Transition Metal", phase:"Solid", color:"reddish-brown", density:8.96, meltingPointC:1085, boilingPointC:2562, electronConfiguration:"[Ar] 3d10 4s1", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Excellent electrical conductor","Used historically for coins"], electronegativity:1.90 },
+  { atomicNumber:30, symbol:"Zn", name:"Zinc", atomicMass:"65.38", group:12, period:4, category:"Transition Metal", phase:"Solid", color:"bluish-white", density:7.14, meltingPointC:419.5, boilingPointC:907, electronConfiguration:"[Ar] 3d10 4s2", discoveryYear:"1746", discoverer:"Andreas Sigismund Marggraf", funFacts:["Used for galvanizing steel","Essential trace nutrient"], electronegativity:1.65 },
+  { atomicNumber:31, symbol:"Ga", name:"Gallium", atomicMass:"69.723", group:13, period:4, category:"Post-transition Metal", phase:"Solid", color:"silvery", density:5.91, meltingPointC:29.76, boilingPointC:2204, electronConfiguration:"[Ar] 3d10 4s2 4p1", discoveryYear:"1875", discoverer:"Paul-Émile Lecoq de Boisbaudran", funFacts:["Melts in hand near room temperature","Used in semiconductors"], electronegativity:1.81 },
+  { atomicNumber:32, symbol:"Ge", name:"Germanium", atomicMass:"72.630", group:14, period:4, category:"Metalloid", phase:"Solid", color:"gray-white", density:5.323, meltingPointC:938.25, boilingPointC:2833, electronConfiguration:"[Ar] 3d10 4s2 4p2", discoveryYear:"1886", discoverer:"Clemens Winkler", funFacts:["Used in semiconductors","Similar chemistry to silicon"], electronegativity:2.01 },
+  { atomicNumber:33, symbol:"As", name:"Arsenic", atomicMass:"74.921595", group:15, period:4, category:"Metalloid", phase:"Solid", color:"gray metallic", density:5.72, meltingPointC:817, boilingPointC:613, electronConfiguration:"[Ar] 3d10 4s2 4p3", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Toxic in many forms","Used historically in pigments"], electronegativity:2.18 },
+  { atomicNumber:34, symbol:"Se", name:"Selenium", atomicMass:"78.971", group:16, period:4, category:"Nonmetal", phase:"Solid", color:"gray to red", density:4.81, meltingPointC:217, boilingPointC:684.9, electronConfiguration:"[Ar] 3d10 4s2 4p4", discoveryYear:"1817", discoverer:"Jöns Jakob Berzelius", funFacts:["Photoconductive in certain forms","Essential trace nutrient"], electronegativity:2.55 },
+  { atomicNumber:35, symbol:"Br", name:"Bromine", atomicMass:"79.904", group:17, period:4, category:"Halogen", phase:"Liquid", color:"reddish-brown", density:3.1028, meltingPointC:-7.2, boilingPointC:58.8, electronConfiguration:"[Ar] 3d10 4s2 4p5", discoveryYear:"1826", discoverer:"Antoine Jérôme Balard", funFacts:["Only nonmetallic element liquid at room temp besides mercury","Used in flame retardants"], electronegativity:2.96 },
+  { atomicNumber:36, symbol:"Kr", name:"Krypton", atomicMass:"83.798", group:18, period:4, category:"Noble Gas", phase:"Gas", color:"colorless", density:3.749, meltingPointC:-157.36, boilingPointC:-153.22, electronConfiguration:"[Ar] 3d10 4s2 4p6", discoveryYear:"1898", discoverer:"Sir William Ramsay & Morris Travers", funFacts:["Used in lighting and lasers","Inert gas"], electronegativity:null },
+  { atomicNumber:37, symbol:"Rb", name:"Rubidium", atomicMass:"85.4678", group:1, period:5, category:"Alkali Metal", phase:"Solid", color:"silvery-white", density:1.532, meltingPointC:39.3, boilingPointC:688, electronConfiguration:"[Kr] 5s1", discoveryYear:"1861", discoverer:"Robert Bunsen & Gustav Kirchhoff", funFacts:["Highly reactive","Used in atomic clocks"], electronegativity:0.82 },
+  { atomicNumber:38, symbol:"Sr", name:"Strontium", atomicMass:"87.62", group:2, period:5, category:"Alkaline Earth Metal", phase:"Solid", color:"silvery", density:2.63, meltingPointC:777, boilingPointC:1382, electronConfiguration:"[Kr] 5s2", discoveryYear:"1790", discoverer:"Adair Crawford", funFacts:["Used in fireworks (red color)","Radioactive isotope used in medicine"], electronegativity:0.95 },
+  { atomicNumber:39, symbol:"Y", name:"Yttrium", atomicMass:"88.90584", group:3, period:5, category:"Transition Metal", phase:"Solid", color:"silvery", density:4.47, meltingPointC:1526, boilingPointC:3338, electronConfiguration:"[Kr] 4d1 5s2", discoveryYear:"1794", discoverer:"Johan Gadolin", funFacts:["Used in LEDs and phosphors","Rare earth element"], electronegativity:1.22 },
+  { atomicNumber:40, symbol:"Zr", name:"Zirconium", atomicMass:"91.224", group:4, period:5, category:"Transition Metal", phase:"Solid", color:"silvery-gray", density:6.52, meltingPointC:1855, boilingPointC:4409, electronConfiguration:"[Kr] 4d2 5s2", discoveryYear:"1789", discoverer:"Martin Heinrich Klaproth", funFacts:["Very corrosion resistant","Used in nuclear reactors"], electronegativity:1.33 },
+  { atomicNumber:41, symbol:"Nb", name:"Niobium", atomicMass:"92.90637", group:5, period:5, category:"Transition Metal", phase:"Solid", color:"gray-white", density:8.57, meltingPointC:2477, boilingPointC:4744, electronConfiguration:"[Kr] 4d4 5s1", discoveryYear:"1801", discoverer:"Charles Hatchett / Heinrich Rose (naming)", funFacts:["Used in superconducting alloys","Used in steelmaking"], electronegativity:1.6 },
+  { atomicNumber:42, symbol:"Mo", name:"Molybdenum", atomicMass:"95.95", group:6, period:5, category:"Transition Metal", phase:"Solid", color:"gray", density:10.28, meltingPointC:2623, boilingPointC:4639, electronConfiguration:"[Kr] 4d5 5s1", discoveryYear:"1778", discoverer:"Carl Wilhelm Scheele (isolated later)", funFacts:["Essential trace element","Used in high-strength steel alloys"], electronegativity:2.16 },
+  { atomicNumber:43, symbol:"Tc", name:"Technetium", atomicMass:"98", group:7, period:5, category:"Transition Metal", phase:"Solid (synthetic)", color:"silvery-gray", density:11.5, meltingPointC:2157, boilingPointC:4265, electronConfiguration:"[Kr] 4d5 5s2", discoveryYear:"1937", discoverer:"Carlo Perrier & Emilio Segrè", funFacts:["First artificially produced element","Used in medical diagnostics (99mTc)"], electronegativity:1.9 },
+  { atomicNumber:44, symbol:"Ru", name:"Ruthenium", atomicMass:"101.07", group:8, period:5, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:12.45, meltingPointC:2334, boilingPointC:4150, electronConfiguration:"[Kr] 4d7 5s1", discoveryYear:"1827", discoverer:"Karl Ernst Claus", funFacts:["Used in electronics and catalysts","Hard, corrosion-resistant"], electronegativity:2.2 },
+  { atomicNumber:45, symbol:"Rh", name:"Rhodium", atomicMass:"102.90550", group:9, period:5, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:12.41, meltingPointC:1964, boilingPointC:3695, electronConfiguration:"[Kr] 4d8 5s1", discoveryYear:"1803", discoverer:"William Hyde Wollaston", funFacts:["Highly reflective and corrosion-resistant","Used in catalytic converters"], electronegativity:2.28 },
+  { atomicNumber:46, symbol:"Pd", name:"Palladium", atomicMass:"106.42", group:10, period:5, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:12.02, meltingPointC:1555, boilingPointC:2963, electronConfiguration:"[Kr] 4d10", discoveryYear:"1803", discoverer:"William Hyde Wollaston", funFacts:["Catalyst in hydrogenation","Used in jewelry and electronics"], electronegativity:2.20 },
+  { atomicNumber:47, symbol:"Ag", name:"Silver", atomicMass:"107.8682", group:11, period:5, category:"Transition Metal", phase:"Solid", color:"lustrous white", density:10.49, meltingPointC:961.78, boilingPointC:2162, electronConfiguration:"[Kr] 4d10 5s1", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Best electrical conductor of metals","Used in jewelry and coins"], electronegativity:1.93 },
+  { atomicNumber:48, symbol:"Cd", name:"Cadmium", atomicMass:"112.414", group:12, period:5, category:"Transition Metal", phase:"Solid", color:"silvery-blue", density:8.65, meltingPointC:321.07, boilingPointC:767, electronConfiguration:"[Kr] 4d10 5s2", discoveryYear:"1817", discoverer:"Friedrich Stromeyer", funFacts:["Toxic heavy metal","Used in NiCd batteries (legacy)"], electronegativity:1.69 },
+  { atomicNumber:49, symbol:"In", name:"Indium", atomicMass:"114.818", group:13, period:5, category:"Post-transition Metal", phase:"Solid", color:"silvery-white", density:7.31, meltingPointC:156.6, boilingPointC:2072, electronConfiguration:"[Kr] 4d10 5s2 5p1", discoveryYear:"1863", discoverer:"Ferdinand Reich & Hieronymus Theodor Richter", funFacts:["Soft, low-melting metal","Used in LCDs (indium tin oxide)"], electronegativity:1.78 },
+  { atomicNumber:50, symbol:"Sn", name:"Tin", atomicMass:"118.710", group:14, period:5, category:"Post-transition Metal", phase:"Solid", color:"silvery", density:7.265, meltingPointC:231.93, boilingPointC:2602, electronConfiguration:"[Kr] 4d10 5s2 5p2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Used in alloys like bronze","Resists corrosion"], electronegativity:1.96 },
+  { atomicNumber:51, symbol:"Sb", name:"Antimony", atomicMass:"121.760", group:15, period:5, category:"Metalloid", phase:"Solid", color:"silvery-gray", density:6.697, meltingPointC:630.63, boilingPointC:1587, electronConfiguration:"[Kr] 4d10 5s2 5p3", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Used in flame retardants","Has multiple oxidation states"], electronegativity:2.05 },
+  { atomicNumber:52, symbol:"Te", name:"Tellurium", atomicMass:"127.60", group:16, period:5, category:"Metalloid", phase:"Solid", color:"silvery-white to gray", density:6.24, meltingPointC:449.5, boilingPointC:988, electronConfiguration:"[Kr] 4d10 5s2 5p4", discoveryYear:"1782", discoverer:"Franz-Joseph Müller von Reichenstein", funFacts:["Used in alloys and thermoelectrics","Rare element"], electronegativity:2.1 },
+  { atomicNumber:53, symbol:"I", name:"Iodine", atomicMass:"126.90447", group:17, period:5, category:"Halogen", phase:"Solid", color:"dark gray / violet vapor", density:4.933, meltingPointC:113.7, boilingPointC:184.3, electronConfiguration:"[Kr] 4d10 5s2 5p5", discoveryYear:"1811", discoverer:"Bernard Courtois", funFacts:["Sublimes to violet vapor","Essential micronutrient (iodized salt)"], electronegativity:2.66 },
+  { atomicNumber:54, symbol:"Xe", name:"Xenon", atomicMass:"131.293", group:18, period:5, category:"Noble Gas", phase:"Gas", color:"colorless", density:5.894, meltingPointC:-111.8, boilingPointC:-108.12, electronConfiguration:"[Kr] 4d10 5s2 5p6", discoveryYear:"1898", discoverer:"Sir William Ramsay & Morris Travers", funFacts:["Used in lamps and anesthesia","Forms some compounds"], electronegativity:null },
+  { atomicNumber:55, symbol:"Cs", name:"Caesium", atomicMass:"132.90545196", group:1, period:6, category:"Alkali Metal", phase:"Solid", color:"golden", density:1.93, meltingPointC:28.5, boilingPointC:671, electronConfiguration:"[Xe] 6s1", discoveryYear:"1860", discoverer:"Gustav Kirchhoff & Robert Bunsen", funFacts:["Extremely reactive","Used in atomic clocks"], electronegativity:0.79 },
+  { atomicNumber:56, symbol:"Ba", name:"Barium", atomicMass:"137.327", group:2, period:6, category:"Alkaline Earth Metal", phase:"Solid", color:"silvery-white", density:3.51, meltingPointC:727, boilingPointC:1897, electronConfiguration:"[Xe] 6s2", discoveryYear:"1808", discoverer:"Humphry Davy", funFacts:["Used in drilling fluids and fireworks","Some compounds are toxic"], electronegativity:0.89 },
+  { atomicNumber:57, symbol:"La", name:"Lanthanum", atomicMass:"138.90547", group:3, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:6.162, meltingPointC:920, boilingPointC:3464, electronConfiguration:"[Xe] 5d1 6s2", discoveryYear:"1839", discoverer:"Carl Gustaf Mosander", funFacts:["Used in camera lenses and catalysts","Start of lanthanide series"], electronegativity:1.10 },
+  { atomicNumber:58, symbol:"Ce", name:"Cerium", atomicMass:"140.116", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:6.77, meltingPointC:798, boilingPointC:3426, electronConfiguration:"[Xe] 4f1 5d1 6s2", discoveryYear:"1839", discoverer:"Martin Heinrich Klaproth / Jöns Jakob Berzelius / Wilhelm Hisinger", funFacts:["Most abundant lanthanide","Used in catalytic converters"], electronegativity:1.12 },
+  { atomicNumber:59, symbol:"Pr", name:"Praseodymium", atomicMass:"140.90766", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery", density:6.77, meltingPointC:931, boilingPointC:3520, electronConfiguration:"[Xe] 4f3 6s2", discoveryYear:"1885", discoverer:"Carl Auer von Welsbach", funFacts:["Used in magnets and alloys","Named for green salts"], electronegativity:1.13 },
+  { atomicNumber:60, symbol:"Nd", name:"Neodymium", atomicMass:"144.242", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:7.01, meltingPointC:1024, boilingPointC:3074, electronConfiguration:"[Xe] 4f4 6s2", discoveryYear:"1885", discoverer:"Carl Auer von Welsbach", funFacts:["Used in strong permanent magnets","Important in electronics"], electronegativity:1.14 },
+  { atomicNumber:61, symbol:"Pm", name:"Promethium", atomicMass:"145", group:null, period:6, category:"Lanthanide", phase:"Solid (synthetic)", color:"metallic", density:7.26, meltingPointC:1100, boilingPointC:3000, electronConfiguration:"[Xe] 4f5 6s2", discoveryYear:"1945", discoverer:"Chien-Shiung Wu / Jacob A. Marinsky & Lawrence E. Glendenin (isotopes)", funFacts:["Only radioactive lanthanide","Used in luminous paint and research"], electronegativity:1.13 },
+  { atomicNumber:62, symbol:"Sm", name:"Samarium", atomicMass:"150.36", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery", density:7.52, meltingPointC:1072, boilingPointC:1900, electronConfiguration:"[Xe] 4f6 6s2", discoveryYear:"1879", discoverer:"Paul Émile Lecoq de Boisbaudran", funFacts:["Used in magnets and cancer therapy","Has many isotopes"], electronegativity:1.17 },
+  { atomicNumber:63, symbol:"Eu", name:"Europium", atomicMass:"151.964", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:5.24, meltingPointC:822, boilingPointC:1529, electronConfiguration:"[Xe] 4f7 6s2", discoveryYear:"1901", discoverer:"Eugène-Anatole Demarçay", funFacts:["Used in red phosphors for TV screens","Soft and reactive"], electronegativity:1.2 },
+  { atomicNumber:64, symbol:"Gd", name:"Gadolinium", atomicMass:"157.25", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:7.90, meltingPointC:1313, boilingPointC:3273, electronConfiguration:"[Xe] 4f7 5d1 6s2", discoveryYear:"1880", discoverer:"Jean Charles Galissard de Marignac", funFacts:["Used in MRI contrast agents","Strong magnetic properties"], electronegativity:1.20 },
+  { atomicNumber:65, symbol:"Tb", name:"Terbium", atomicMass:"158.92535", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-gray", density:8.25, meltingPointC:1356, boilingPointC:3123, electronConfiguration:"[Xe] 4f9 6s2", discoveryYear:"1843", discoverer:"Carl Gustaf Mosander", funFacts:["Used in green phosphors","Rare earth element"], electronegativity:1.2 },
+  { atomicNumber:66, symbol:"Dy", name:"Dysprosium", atomicMass:"162.500", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:8.54, meltingPointC:1407, boilingPointC:2567, electronConfiguration:"[Xe] 4f10 6s2", discoveryYear:"1886", discoverer:"Paul Émile Lecoq de Boisbaudran", funFacts:["High magnetic susceptibility","Used in nuclear reactors"], electronegativity:1.22 },
+  { atomicNumber:67, symbol:"Ho", name:"Holmium", atomicMass:"164.93033", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:8.79, meltingPointC:1474, boilingPointC:2700, electronConfiguration:"[Xe] 4f11 6s2", discoveryYear:"1878", discoverer:"Per Teodor Cleve", funFacts:["Used in lasers and magnets","High magnetic moment"], electronegativity:1.23 },
+  { atomicNumber:68, symbol:"Er", name:"Erbium", atomicMass:"167.259", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:9.07, meltingPointC:1529, boilingPointC:2868, electronConfiguration:"[Xe] 4f12 6s2", discoveryYear:"1843", discoverer:"Carl Gustaf Mosander", funFacts:["Used in optical amplifiers","Used in fiber-optic communications"], electronegativity:1.24 },
+  { atomicNumber:69, symbol:"Tm", name:"Thulium", atomicMass:"168.93422", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-gray", density:9.32, meltingPointC:1545, boilingPointC:1950, electronConfiguration:"[Xe] 4f13 6s2", discoveryYear:"1879", discoverer:"Per Teodor Cleve", funFacts:["One of the rarest lanthanides","Used in portable X-ray devices"], electronegativity:1.25 },
+  { atomicNumber:70, symbol:"Yb", name:"Ytterbium", atomicMass:"173.045", group:null, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:6.97, meltingPointC:824, boilingPointC:1196, electronConfiguration:"[Xe] 4f14 6s2", discoveryYear:"1878", discoverer:"Jean Charles Galissard de Marignac", funFacts:["Used in atomic clocks and lasers","Soft metal"], electronegativity:1.1 },
+  { atomicNumber:71, symbol:"Lu", name:"Lutetium", atomicMass:"174.9668", group:3, period:6, category:"Lanthanide", phase:"Solid", color:"silvery-white", density:9.84, meltingPointC:1663, boilingPointC:3402, electronConfiguration:"[Xe] 4f14 5d1 6s2", discoveryYear:"1907", discoverer:"Georges Urbain / Carl Auer von Welsbach / Charles James", funFacts:["Hard, dense rare earth","Used in PET scan detectors"], electronegativity:1.27 },
+  { atomicNumber:72, symbol:"Hf", name:"Hafnium", atomicMass:"178.49", group:4, period:6, category:"Transition Metal", phase:"Solid", color:"silvery-gray", density:13.31, meltingPointC:2233, boilingPointC:4603, electronConfiguration:"[Xe] 4f14 5d2 6s2", discoveryYear:"1923", discoverer:"George de Hevesy & Dirk Coster", funFacts:["Used in control rods and superalloys","Resistant to corrosion"], electronegativity:1.3 },
+  { atomicNumber:73, symbol:"Ta", name:"Tantalum", atomicMass:"180.94788", group:5, period:6, category:"Transition Metal", phase:"Solid", color:"gray-blue", density:16.69, meltingPointC:3017, boilingPointC:5458, electronConfiguration:"[Xe] 4f14 5d3 6s2", discoveryYear:"1802", discoverer:"Andrés Manuel del Río / Heinrich Klaproth (naming)", funFacts:["Used in capacitors and medical implants","Very corrosion resistant"], electronegativity:1.5 },
+  { atomicNumber:74, symbol:"W", name:"Tungsten", atomicMass:"183.84", group:6, period:6, category:"Transition Metal", phase:"Solid", color:"gray-white", density:19.25, meltingPointC:3422, boilingPointC:5555, electronConfiguration:"[Xe] 4f14 5d4 6s2", discoveryYear:"1783", discoverer:"José and Fausto Elhuyar", funFacts:["Highest melting point of pure metals","Used in filaments and heavy alloys"], electronegativity:2.36 },
+  { atomicNumber:75, symbol:"Re", name:"Rhenium", atomicMass:"186.207", group:7, period:6, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:21.02, meltingPointC:3186, boilingPointC:5596, electronConfiguration:"[Xe] 4f14 5d5 6s2", discoveryYear:"1925", discoverer:"Walter Noddack, Ida Noddack, Otto Berg", funFacts:["Rare, used in high-temp superalloys","High melting point"], electronegativity:1.9 },
+  { atomicNumber:76, symbol:"Os", name:"Osmium", atomicMass:"190.23", group:8, period:6, category:"Transition Metal", phase:"Solid", color:"blue-gray", density:22.59, meltingPointC:3033, boilingPointC:5027, electronConfiguration:"[Xe] 4f14 5d6 6s2", discoveryYear:"1803", discoverer:"Smithson Tennant", funFacts:["Densest naturally occurring element","Very hard and brittle"], electronegativity:2.2 },
+  { atomicNumber:77, symbol:"Ir", name:"Iridium", atomicMass:"192.217", group:9, period:6, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:22.56, meltingPointC:2466, boilingPointC:4130, electronConfiguration:"[Xe] 4f14 5d7 6s2", discoveryYear:"1803", discoverer:"Smithson Tennant", funFacts:["Highly corrosion-resistant","Used in spark plugs and crucibles"], electronegativity:2.2 },
+  { atomicNumber:78, symbol:"Pt", name:"Platinum", atomicMass:"195.084", group:10, period:6, category:"Transition Metal", phase:"Solid", color:"silvery-white", density:21.45, meltingPointC:1768.3, boilingPointC:3825, electronConfiguration:"[Xe] 4f14 5d9 6s1", discoveryYear:"Ancient", discoverer:"Known to ancient cultures", funFacts:["Catalyst in vehicles and industry","Used in jewelry and electrodes"], electronegativity:2.28 },
+  { atomicNumber:79, symbol:"Au", name:"Gold", atomicMass:"196.966569", group:11, period:6, category:"Transition Metal", phase:"Solid", color:"golden", density:19.32, meltingPointC:1064.18, boilingPointC:2856, electronConfiguration:"[Xe] 4f14 5d10 6s1", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Highly corrosion-resistant","Used as currency and jewelry"], electronegativity:2.54 },
+  { atomicNumber:80, symbol:"Hg", name:"Mercury", atomicMass:"200.592", group:12, period:6, category:"Transition Metal", phase:"Liquid", color:"silvery", density:13.534, meltingPointC:-38.83, boilingPointC:356.73, electronConfiguration:"[Xe] 4f14 5d10 6s2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Only metal liquid at room temp (besides bromine being nonmetal)","Toxic"], electronegativity:2.00 },
+  { atomicNumber:81, symbol:"Tl", name:"Thallium", atomicMass:"204.38", group:13, period:6, category:"Post-transition Metal", phase:"Solid", color:"gray-blue", density:11.85, meltingPointC:304, boilingPointC:1473, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p1", discoveryYear:"1861", discoverer:"William Crookes", funFacts:["Toxic heavy metal","Used in electronics and alloys"], electronegativity:1.62 },
+  { atomicNumber:82, symbol:"Pb", name:"Lead", atomicMass:"207.2", group:14, period:6, category:"Post-transition Metal", phase:"Solid", color:"bluish-white", density:11.34, meltingPointC:327.46, boilingPointC:1749, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p2", discoveryYear:"Ancient", discoverer:"Ancient civilizations", funFacts:["Historically used in pipes and paints (toxic)","Heavy and malleable"], electronegativity:2.33 },
+  { atomicNumber:83, symbol:"Bi", name:"Bismuth", atomicMass:"208.98040", group:15, period:6, category:"Post-transition Metal", phase:"Solid", color:"silvery with pink hue", density:9.78, meltingPointC:271.5, boilingPointC:1564, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p3", discoveryYear:"Ancient", discoverer:"Known in antiquity", funFacts:["Low toxicity compared to lead","Crystalline, colorful oxide skins"], electronegativity:2.02 },
+  { atomicNumber:84, symbol:"Po", name:"Polonium", atomicMass:"209", group:16, period:6, category:"Metalloid", phase:"Solid (radioactive)", color:"silvery", density:9.32, meltingPointC:254, boilingPointC:962, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p4", discoveryYear:"1898", discoverer:"Marie & Pierre Curie", funFacts:["Highly radioactive","Extremely rare and dangerous"], electronegativity:2.0 },
+  { atomicNumber:85, symbol:"At", name:"Astatine", atomicMass:"210", group:17, period:6, category:"Halogen", phase:"Solid (radioactive)", color:"unknown", density:7, meltingPointC:302, boilingPointC:337, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p5", discoveryYear:"1940", discoverer:"D. Corson, K. MacKenzie, E. Segrè", funFacts:["Rare and highly radioactive","Named from Greek 'astatos' meaning unstable"], electronegativity:2.2 },
+  { atomicNumber:86, symbol:"Rn", name:"Radon", atomicMass:"222", group:18, period:6, category:"Noble Gas", phase:"Gas (radioactive)", color:"colorless", density:9.73, meltingPointC:-71, boilingPointC:-61.7, electronConfiguration:"[Xe] 4f14 5d10 6s2 6p6", discoveryYear:"1900", discoverer:"Friedrich Ernst Dorn", funFacts:["Radioactive noble gas","Health hazard in basements"], electronegativity:null },
+  { atomicNumber:87, symbol:"Fr", name:"Francium", atomicMass:"223", group:1, period:7, category:"Alkali Metal", phase:"Solid (highly radioactive)", color:"unknown", density:1.87, meltingPointC:27, boilingPointC:677, electronConfiguration:"[Rn] 7s1", discoveryYear:"1939", discoverer:"Marguerite Perey", funFacts:["Extremely rare and radioactive","Short-lived isotopes"], electronegativity:0.7 },
+  { atomicNumber:88, symbol:"Ra", name:"Radium", atomicMass:"226", group:2, period:7, category:"Alkaline Earth Metal", phase:"Solid (radioactive)", color:"silvery-white", density:5.5, meltingPointC:700, boilingPointC:1140, electronConfiguration:"[Rn] 7s2", discoveryYear:"1898", discoverer:"Marie & Pierre Curie", funFacts:["Highly radioactive","Formerly used in glow-in-the-dark paints (dangerous)"], electronegativity:0.9 },
+  { atomicNumber:89, symbol:"Ac", name:"Actinium", atomicMass:"227", group:3, period:7, category:"Actinide", phase:"Solid (radioactive)", color:"silvery-white", density:10.07, meltingPointC:1050, boilingPointC:3200, electronConfiguration:"[Rn] 6d1 7s2", discoveryYear:"1899", discoverer:"Friedrich O. Giesel", funFacts:["First of the actinides","Radioactive and scarce"], electronegativity:1.1 },
+  { atomicNumber:90, symbol:"Th", name:"Thorium", atomicMass:"232.0377", group:null, period:7, category:"Actinide", phase:"Solid", color:"silvery", density:11.72, meltingPointC:1750, boilingPointC:4820, electronConfiguration:"[Rn] 6d2 7s2", discoveryYear:"1829", discoverer:"Jöns Jakob Berzelius", funFacts:["Potential nuclear fuel (thorium cycle)","Radioactive"], electronegativity:1.3 },
+  { atomicNumber:91, symbol:"Pa", name:"Protactinium", atomicMass:"231.03588", group:null, period:7, category:"Actinide", phase:"Solid (radioactive)", color:"silvery", density:15.37, meltingPointC:1572, boilingPointC:4000, electronConfiguration:"[Rn] 5f2 6d1 7s2", discoveryYear:"1913", discoverer:"Kasimir Fajans & Oswald Helmuth Göhring", funFacts:["Rare and highly radioactive","Used mainly in research"], electronegativity:1.5 },
+  { atomicNumber:92, symbol:"U", name:"Uranium", atomicMass:"238.02891", group:null, period:7, category:"Actinide", phase:"Solid", color:"silvery-gray", density:19.1, meltingPointC:1132, boilingPointC:4131, electronConfiguration:"[Rn] 5f3 6d1 7s2", discoveryYear:"1789", discoverer:"Martin Heinrich Klaproth", funFacts:["Fuel for nuclear reactors and weapons","Highly radioactive"], electronegativity:1.38 },
+  { atomicNumber:93, symbol:"Np", name:"Neptunium", atomicMass:"237", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery", density:20.45, meltingPointC:644, boilingPointC:4000, electronConfiguration:"[Rn] 5f4 6d1 7s2", discoveryYear:"1940", discoverer:"Edwin McMillan & Philip H. Abelson", funFacts:["First transuranic element produced","Radioactive"], electronegativity:1.36 },
+  { atomicNumber:94, symbol:"Pu", name:"Plutonium", atomicMass:"244", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery (ages)", density:19.84, meltingPointC:639.4, boilingPointC:3235, electronConfiguration:"[Rn] 5f6 7s2", discoveryYear:"1940", discoverer:"Glenn T. Seaborg, Joseph W. Kennedy, Arthur C. Wahl & Emilio Segrè", funFacts:["Used in nuclear weapons and reactors","Many allotropes"], electronegativity:1.28 },
+  { atomicNumber:95, symbol:"Am", name:"Americium", atomicMass:"243", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery-white", density:13.67, meltingPointC:1176, boilingPointC:2607, electronConfiguration:"[Rn] 5f7 7s2", discoveryYear:"1944", discoverer:"Glenn T. Seaborg et al.", funFacts:["Used in smoke detectors (Am-241)","Synthetic and radioactive"], electronegativity:1.13 },
+  { atomicNumber:96, symbol:"Cm", name:"Curium", atomicMass:"247", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery-white", density:13.51, meltingPointC:1340, boilingPointC:3110, electronConfiguration:"[Rn] 5f7 6d1 7s2", discoveryYear:"1944", discoverer:"Glenn T. Seaborg et al.", funFacts:["Highly radioactive","Used in research"], electronegativity:1.28 },
+  { atomicNumber:97, symbol:"Bk", name:"Berkelium", atomicMass:"247", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery", density:14, meltingPointC:986, boilingPointC:null, electronConfiguration:"[Rn] 5f9 7s2", discoveryYear:"1949", discoverer:"Lawrence Berkeley team", funFacts:["Synthetic radioelement","Used only in research"], electronegativity:1.3 },
+  { atomicNumber:98, symbol:"Cf", name:"Californium", atomicMass:"251", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"silvery", density:15.1, meltingPointC:900, boilingPointC:null, electronConfiguration:"[Rn] 5f10 7s2", discoveryYear:"1950", discoverer:"Lawrence Radiation Laboratory", funFacts:["Used as a neutron source in industry","Synthetic and radioactive"], electronegativity:1.3 },
+  { atomicNumber:99, symbol:"Es", name:"Einsteinium", atomicMass:"252", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"metallic", density:8.84, meltingPointC:860, boilingPointC:null, electronConfiguration:"[Rn] 5f11 7s2", discoveryYear:"1952", discoverer:"Albert Ghiorso et al. (debris of hydrogen bomb)", funFacts:["First discovered in nuclear debris","Extremely radioactive and scarce"], electronegativity:1.3 },
+  { atomicNumber:100, symbol:"Fm", name:"Fermium", atomicMass:"257", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:9.7, meltingPointC:1527, boilingPointC:null, electronConfiguration:"[Rn] 5f12 7s2", discoveryYear:"1952", discoverer:"Albert Ghiorso et al.", funFacts:["Produced in nuclear tests and reactors","Very short-lived isotopes"], electronegativity:1.3 },
+  { atomicNumber:101, symbol:"Md", name:"Mendelevium", atomicMass:"258", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f13 7s2", discoveryYear:"1955", discoverer:"Lawrence Berkeley team", funFacts:["Named after Dmitri Mendeleev","Synthetic and radioactive"], electronegativity:1.3 },
+  { atomicNumber:102, symbol:"No", name:"Nobelium", atomicMass:"259", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:9.9, meltingPointC:827, boilingPointC:null, electronConfiguration:"[Rn] 5f14 7s2", discoveryYear:"1958", discoverer:"Joint U.S./Sweden discoveries", funFacts:["Named after Alfred Nobel","Very unstable"], electronegativity:1.3 },
+  { atomicNumber:103, symbol:"Lr", name:"Lawrencium", atomicMass:"266", group:null, period:7, category:"Actinide (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:1627, boilingPointC:null, electronConfiguration:"[Rn] 5f14 7s2 7p1", discoveryYear:"1961", discoverer:"Lawrence Berkeley Laboratory", funFacts:["Named after Ernest Lawrence","Synthetic element"], electronegativity:1.3 },
+  { atomicNumber:104, symbol:"Rf", name:"Rutherfordium", atomicMass:"267", group:4, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:23.2, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f14 6d2 7s2", discoveryYear:"1964", discoverer:"Dubna / Berkeley teams", funFacts:["Synthetic transactinide","Studied in particle accelerators"], electronegativity:1.3 },
+  { atomicNumber:105, symbol:"Db", name:"Dubnium", atomicMass:"268", group:5, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f14 6d3 7s2", discoveryYear:"1968", discoverer:"Joint discoveries (Dubna / Berkeley)", funFacts:["Named after Dubna (Russia)","Synthetic element"], electronegativity:1.3 },
+  { atomicNumber:106, symbol:"Sg", name:"Seaborgium", atomicMass:"269", group:6, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f14 6d4 7s2", discoveryYear:"1974", discoverer:"Dubna / Berkeley", funFacts:["Named for Glenn Seaborg","Synthetic and short-lived"], electronegativity:1.3 },
+  { atomicNumber:107, symbol:"Bh", name:"Bohrium", atomicMass:"270", group:7, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f14 6d5 7s2", discoveryYear:"1981", discoverer:"GSI Darmstadt", funFacts:["Named after Niels Bohr","Very short-lived"], electronegativity:1.3 },
+  { atomicNumber:108, symbol:"Hs", name:"Hassium", atomicMass:"269", group:8, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"[Rn] 5f14 6d6 7s2", discoveryYear:"1984", discoverer:"GSI Darmstadt", funFacts:["Named after Hesse (Germany)","Synthetic element"], electronegativity:1.3 },
+  { atomicNumber:109, symbol:"Mt", name:"Meitnerium", atomicMass:"278", group:9, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"1982", discoverer:"GSI Darmstadt", funFacts:["Named after Lise Meitner","Extremely short-lived"], electronegativity:1.3 },
+  { atomicNumber:110, symbol:"Ds", name:"Darmstadtium", atomicMass:"281", group:10, period:7, category:"Transition Metal (synthetic)", phase:"Solid (radioactive)", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"1994", discoverer:"GSI Darmstadt", funFacts:["Named after Darmstadt, Germany","Very short-lived"], electronegativity:1.3 },
+  { atomicNumber:111, symbol:"Rg", name:"Roentgenium", atomicMass:"282", group:11, period:7, category:"Transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"1994", discoverer:"GSI Darmstadt", funFacts:["Named after Wilhelm Röntgen","Very short-lived"], electronegativity:1.3 },
+  { atomicNumber:112, symbol:"Cn", name:"Copernicium", atomicMass:"285", group:12, period:7, category:"Transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"1996", discoverer:"GSI Darmstadt", funFacts:["Named after Copernicus","Extremely short-lived"], electronegativity:1.3 },
+  { atomicNumber:113, symbol:"Nh", name:"Nihonium", atomicMass:"286", group:13, period:7, category:"Post-transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"2003", discoverer:"RIKEN (Japan)", funFacts:["Named for Japan (Nihon)","Very short-lived"], electronegativity:1.3 },
+  { atomicNumber:114, symbol:"Fl", name:"Flerovium", atomicMass:"289", group:14, period:7, category:"Post-transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"1998", discoverer:"Flerov Laboratory (Dubna)", funFacts:["Named after Georgy Flerov","Very short-lived"], electronegativity:1.3 },
+  { atomicNumber:115, symbol:"Mc", name:"Moscovium", atomicMass:"290", group:15, period:7, category:"Post-transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"2003", discoverer:"Joint Dubna/Livermore team", funFacts:["Named after Moscow region","Synthetic and short-lived"], electronegativity:1.3 },
+  { atomicNumber:116, symbol:"Lv", name:"Livermorium", atomicMass:"293", group:16, period:7, category:"Post-transition Metal (synthetic)", phase:"Unknown", color:"unknown", density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"2000", discoverer:"Joint Dubna/Livermore", funFacts:["Named after Livermore lab","Very unstable"], electronegativity:1.3 },
+  { atomicNumber:117, symbol:"Ts", name:"Tennessine", atomicMass:"294", group:17, period:7, category:"Halogen (synthetic)", phase:null, color:null, density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"2010", discoverer:"Joint Dubna/ORNL", funFacts:["Named after Tennessee, USA","Extremely short-lived"], electronegativity:1.3 },
+  { atomicNumber:118, symbol:"Og", name:"Oganesson", atomicMass:"294", group:18, period:7, category:"Noble Gas (synthetic)", phase:null, color:null, density:null, meltingPointC:null, boilingPointC:null, electronConfiguration:"predicted", discoveryYear:"2002", discoverer:"Joint Dubna/Livermore", funFacts:["Named after Yuri Oganessian","Very heavy, radioactive, unusual predicted properties"], electronegativity:null }
+];
+
+// If an external dataset is provided by dropping a script that sets window.ELEMENTS,
+// prefer that; otherwise use sampleElements.
+const ELEMENTS = window.ELEMENTS && Array.isArray(window.ELEMENTS) ? window.ELEMENTS : sampleElements;
+
+/* ---------------------------
+   Category color map
+   Add or tweak categories as needed.
+   --------------------------- */
+const CATEGORY_COLORS = {
+  "Alkali Metal": "#ff7b7b",
+  "Alkaline Earth Metal": "#ffbf69",
+  "Transition Metal": "#ffd166",
+  "Post-transition Metal": "#9be7a3",
+  "Metalloid": "#7bdff9",
+  "Nonmetal": "#89a1ff",
+  "Halogen": "#c896ff",
+  "Noble Gas": "#ff9fb0",
+  "Lanthanide": "#fff1a8",
+  "Actinide": "#ffcccb",
+  // fallback
+  "default": "#e2e8f0"
+};
+
+/* ---------------------------
+   Utility functions
+   --------------------------- */
+function formatNumber(n) {
+  return (n === null || n === undefined) ? "—" : String(n);
+}
+
+function downloadTextFile(filename, text) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], {type:'text/plain'}));
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/* ---------------------------
+   React app
+   --------------------------- */
+const { useState, useMemo, useEffect, useRef } = React;
+
+function App() {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [compareSet, setCompareSet] = useState([]);
+  const [visibleYear, setVisibleYear] = useState  (2025);
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const [trendProperty, setTrendProperty] = useState(null);
+  const [showLegend, setShowLegend] = useState(true); // Add this missing state
+
+  // Create a deep copy of ELEMENTS to prevent mutations
+  const elements = ELEMENTS;
+
+  // Use only ONE version of these functions:
+  function openElement(el) {
+    setSelected({...el});
+  }
+
+  function closeModal() {
+    setSelected(null);
+  }
+
+  function toggleCompare(el) {
+    setCompareSet(prev => {
+      if (prev.find(x => x.atomicNumber === el.atomicNumber)) {
+        return prev.filter(x => x.atomicNumber !== el.atomicNumber);
+      }
+      return [...prev, {...el}];
+    });
+  }
+
+  // Keyboard navigation: always use a copy
+  useEffect(() => {
+    function onKey(e) {
+      // changed: avoid optional chaining for older engines/browsers
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      if (e.key === 'Escape') { closeModal(); setCompareSet([]); return; }
+      if (!selected) return;
+      const deltaMap = {'ArrowRight':1,'ArrowLeft':-1,'ArrowDown':18,'ArrowUp':-18};
+      const delta = deltaMap[e.key];
+      if (delta) {
+        e.preventDefault();
+        const targetAtomic = selected.atomicNumber + delta;
+        const nextElement = elements.find(el => el.atomicNumber === targetAtomic);
+        if (nextElement) {
+          setSelected({...nextElement}); // always copy!
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selected, elements]);
+
+  // filtered elements by query and timeline
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return elements.filter(e => {
+      if (categoryFilter && e.category !== categoryFilter) return false;
+      if (e.discoveryYear) {
+        const yearNum = parseInt(String(e.discoveryYear).replace(/[^\d-]/g,''),10);
+        if (!isNaN(yearNum) && yearNum > visibleYear) return false;
+      }
+      if (!q) return true;
+      return (
+        String(e.name).toLowerCase().includes(q) ||
+        String(e.symbol).toLowerCase() === q ||
+        String(e.atomicNumber) === q ||
+        (String(e.name).toLowerCase().startsWith(q))
+      );
+    }).sort((a,b)=>a.atomicNumber - b.atomicNumber);
+  }, [query, visibleYear, categoryFilter, elements]);
+
+  // Add this new useMemo hook after other useMemo declarations but before trendColorFor:
+  const trendStats = useMemo(() => {
+    if (!trendProperty) return null;
+    const values = elements
+      .map(el => el[trendProperty])
+      .filter(v => v !== null && v !== undefined && !isNaN(v));
+    if (!values.length) return null;
+    return {
+      min: Math.min(...values),
+      max: Math.max(...values)
+    };
+  }, [trendProperty, elements]);
+
+  // helper for trend color scaling (now trendStats will be defined)
+  function trendColorFor(val) {
+    if (!trendStats || val === null || val === undefined || typeof val !== 'number') return null;
+    const {min,max} = trendStats;
+    if (min === max) return '#e2e8f0';
+    const t = (val - min) / (max - min);
+    const cmap = (t) => {
+      const r = Math.round(255 - 120 * t);
+      const g = Math.round(250 - 130 * t);
+      const b = Math.round(230 - 80 * t);
+      return `rgb(${r},${g},${b})`;
+    };
+    return cmap(t);
+  }
+
+  function exportSelectedCSV() {
+    const arr = compareSet.length ? compareSet : (selected ? [selected] : []);
+    if (!arr.length) { alert('No elements selected for export.'); return; }
+    const cols = ["atomicNumber","symbol","name","atomicMass","group","period","category","phase","density","meltingPointC","boilingPointC","discoveryYear","discoverer","funFacts"];
+    const header = cols.join(',');
+    const rows = arr.map(e => cols.map(c => {
+      let v = e[c];
+      if (Array.isArray(v)) v = '"'+String(v.join("; ")).replace(/"/g,'""')+'"';
+      if (v === null || v === undefined) return "";
+      return `"${String(v).replace(/"/g,'""')}"`;
+    }).join(','));
+       downloadTextFile('elements_export.csv', [header, ...rows].join('\n'));
+  }
+
+  function exportStateJSON() {
+    const data = {
+      query,
+      visibleYear,
+      trendProperty,
+      // export shallow copies to avoid exposing live references
+      compareSet: compareSet.map(x=> ({ ...x })),
+      selected: selected ? ({ ...selected }) : null
+    };
+    downloadTextFile('periodic_table_state.json', JSON.stringify(data, null, 2));
+  }
+
+  // categories present in dataset
+  const categories = useMemo(() => {
+    const set = new Set(ELEMENTS.map(e=>e.category || "Unknown"));
+    return Array.from(set);
+  }, []);
+
+  // keyboard navigation: arrow keys move selection by atomic number increments
+  useEffect(() => {
+    function onKey(e) {
+      // changed: avoid optional chaining for older engines/browsers
+      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      if (e.key === 'Escape') { closeModal(); setCompareSet([]); return; }
+      if (!selected) return;
+      const deltaMap = {'ArrowRight':1,'ArrowLeft':-1,'ArrowDown':18,'ArrowUp':-18};
+      const delta = deltaMap[e.key];
+      if (delta) {
+        // don't mutate the selected element object; compute target atomic number
+        e.preventDefault();
+        const targetAtomic = selected.atomicNumber + delta;
+        // find the element with that atomic number (no mutation)
+        const candidate = ELEMENTS.find(el => el.atomicNumber === targetAtomic);
+        if (candidate) setSelected(candidate);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return ()=> window.removeEventListener('keydown', onKey);
+  }, [selected]);
+
+  return (
+    React.createElement('div', {className:'max-w-7xl mx-auto'},
+      // Header
+      React.createElement('div', {className:'flex items-center justify-between mb-4'},
+        React.createElement('h1', {className:'text-2xl font-semibold'}, "Interactive Periodic Table"),
+        React.createElement('div', {className:'flex gap-2 items-center'},
+          React.createElement('input', {type:'search', placeholder:'Search by name, symbol, Z...', value:query, onChange:(e)=>setQuery(e.target.value), className:'px-3 py-1 rounded border shadow-sm', 'aria-label':'Search elements'}),
+          // changed: also reset legend visibility
+          React.createElement('button',{onClick:()=>{setQuery('');setCategoryFilter(null);setTrendProperty(null); setVisibleYear(2025); setCompareSet([]); setSelected(null); setShowLegend(true);}, className:'px-3 py-1 rounded bg-slate-200'}, "Reset"),
+          React.createElement('button',{onClick:()=>{setShowLegend(s=>!s)}, className:'px-3 py-1 rounded bg-slate-200'}, showLegend ? "Hide Legend" : "Show Legend")
+        )
+      ),
+
+      // Controls row
+      React.createElement('div', {className:'flex gap-4 mb-4 flex-wrap'},
+        React.createElement('div', {className:'flex items-center gap-2'},
+          React.createElement('label', {className:'text-sm'},"Timeline (year):"),
+          React.createElement('input', {type:'range', min: -4000, max: 2025, value:visibleYear, onChange:(e)=>setVisibleYear(Number(e.target.value)), className:'w-52'}),
+          React.createElement('span', {className:'ml-2 text-sm font-medium'}, visibleYear)
+        ),
+        React.createElement('div', {className:'flex items-center gap-2'},
+          React.createElement('label', {className:'text-sm'},"Trend:"),
+          React.createElement('select', {value:trendProperty || "", onChange:(e)=>setTrendProperty(e.target.value || null), className:'px-2 py-1 border rounded'},
+            React.createElement('option', {value:""},"— none —"),
+            React.createElement('option', {value:"density"},"Density (g/cm³)"),
+            React.createElement('option', {value:"electronegativity"},"Electronegativity"),
+            React.createElement('option', {value:"meltingPointC"},"Melting point (°C)")
+          )
+        ),
+        React.createElement('div', {className:'flex items-center gap-2'},
+          React.createElement('button', {onClick:exportSelectedCSV, className:'px-3 py-1 rounded bg-sky-500 text-white'}, "Export CSV"),
+          React.createElement('button', {onClick:exportStateJSON, className:'px-3 py-1 rounded bg-slate-200'}, "Save State")
+        ),
+      ),
+
+      // Legend & filters
+      showLegend && React.createElement('div', {className:'mb-4 flex flex-wrap gap-6 items-center'},
+        React.createElement('div', {className:'category-legend'},
+          categories.map(cat =>
+            React.createElement('button', {key:cat, onClick:()=>setCategoryFilter(prev => prev === cat ? null : cat), className:`flex items-center gap-2 px-2 py-1 rounded ${categoryFilter===cat?'ring-2 ring-sky-400':''}`},
+              React.createElement('span', {style:{background:CATEGORY_COLORS[cat]||CATEGORY_COLORS.default, width:16, height:16, borderRadius:4, display:'inline-block'}}),
+              React.createElement('span', {className:'text-sm'}, cat)
+            )
+          )
+        ),
+        React.createElement('div', {className:'text-sm text-slate-600'},"Click a category to filter. Click again to clear.")
+      ),
+
+      // Help text (new)
+      React.createElement('div', {className:'mb-4 text-center text-slate-600'},
+        "Click on any element in the table to view its detailed properties"
+      ),
+
+      // Table grid
+      React.createElement(TableGrid, {elements:filtered, openElement, trendProperty, trendColorFor, visibleYear}),
+
+      // Footer / Compare bar
+      React.createElement('div', {className:'mt-6 p-4 bg-white rounded shadow-sm flex items-center justify-between'},
+        React.createElement('div', null,
+          React.createElement('strong', null, "Compare: "),
+          compareSet.length ? compareSet.map(el => React.createElement('span',{key:el.atomicNumber, className:'px-2 py-1 bg-slate-100 rounded mr-2'} , `${el.symbol} (${el.atomicNumber})`)) : React.createElement('span', {className:'text-slate-500'}, "No elements selected")
+        ),
+        React.createElement('div', {className:'flex gap-2'},
+          React.createElement('button', {onClick:()=>{ if (compareSet.length < 2) alert("Select at least two elements to compare (use the checkbox in the modal)."); else openElement({ compareMode:true })}, className:'px-3 py-1 rounded bg-emerald-500 text-white'}, "Open Comparison"),
+          React.createElement('button', {onClick:()=>{ setCompareSet([]); setSelected(null); }, className:'px-3 py-1 rounded bg-slate200'}, "Clear Selection")
+        )
+      ),
+
+      // Modal (element details)
+      selected && !selected.compareMode && React.createElement(ElementModal, {element:selected, onClose:closeModal, onToggleCompare:toggleCompare, compared:compareSet.find(x=>x.atomicNumber===selected.atomicNumber)})
+      ,
+      // Compare modal
+      selected && selected.compareMode && React.createElement(CompareModal, {items:compareSet, onClose:()=>setSelected(null)})
+    )
+  );
+}
+
+/* ---------------------------
+   TableGrid: layout the periodic table
+   We'll place elements in cells according to period & group, with special rows for lanthanides/actinides
+   --------------------------- */
+function TableGrid({elements, openElement, trendProperty, trendColorFor, visibleYear}) {
+  // build a grid of 7 periods x 18 groups plus lanthanide/actinide rows
+  // We'll create placeholder empty cells where no element exists
+  const grid = Array.from({length:7}, ()=>Array.from({length:18}, ()=>null));
+
+  // map elements by group/period (use atomicNumber placement if group missing)
+  elements.forEach(e => {
+    const p = e.period;
+    const g = e.group;
+    if (p >=1 && p <=7 && g >=1 && g <=18) {
+      grid[p-1][g-1] = e;
+    }
+  });
+
+  // quick helper to layout lanthanides/actinides from elements list (period 6/7 but group "lanthanide" usually encoded differently)
+  const lanthanides = elements.filter(e => String(e.category).toLowerCase().includes('lanthanide')).sort((a,b)=>a.atomicNumber-b.atomicNumber);
+  const actinides = elements.filter(e => String(e.category).toLowerCase().includes('actinide')).sort((a,b)=>a.atomicNumber-b.atomicNumber);
+
+  return React.createElement('div', null,
+    React.createElement('div', {className:'overflow-auto bg-white p-4 rounded shadow-sm'},
+      // show small legend on top for groups numbers
+      React.createElement('div', {className:'grid grid-cols-18 gap-2 mb-2', style:{gridTemplateColumns:'repeat(18, minmax(40px,1fr))'}},
+        Array.from({length:18}, (_,i)=>React.createElement('div', {key:'g'+i, className:'text-xs text-center text-slate-500'}, i+1))
+      ),
+      React.createElement('div', {className:'grid gap-2', style:{gridTemplateColumns:'repeat(18, minmax(48px,1fr))'}},
+        // changed: use string keys to avoid collisions between numeric idx and atomicNumber
+        grid.flat().map((cell, idx) => {
+          if (!cell) {
+            return React.createElement('div', {key: 'empty-' + idx, className:'p-1'});
+          }
+          const color = CATEGORY_COLORS[cell.category] || CATEGORY_COLORS.default;
+          const trendBg = trendProperty ? trendColorFor(cell[trendProperty]) : null;
+          // timeline hidden check: if discoveryYear is after visibleYear hide (render translucent)
+          let visible = true;
+          if (cell.discoveryYear) {
+            const yearNum = parseInt(String(cell.discoveryYear).replace(/[^\d-]/g,''),10);
+            if (!isNaN(yearNum) && yearNum > visibleYear) visible = false;
+          }
+          return React.createElement('div', {key: 'e' + cell.atomicNumber, onClick:()=>openElement(cell), tabIndex:0, role:'button', title:`${cell.name} (${cell.symbol})`, className:`cell ${visible ? '':'opacity-30'}` , style:{background: trendBg || color, border: '1px solid rgba(0,0,0,0.06)'}},
+            React.createElement('div', {className:'text-xs font-semibold'}, cell.symbol),
+            React.createElement('div', {className:'text-[10px] text-slate-700'}, cell.atomicNumber)
+          );
+        })
+      )
+    ),
+    // lanthanide & actinide rows
+    (lanthanides.length > 0 || actinides.length > 0) && React.createElement('div', {className:'mt-3 bg-white p-4 rounded shadow-sm'},
+      lanthanides.length > 0 && React.createElement('div', null,
+        React.createElement('div', {className:'text-sm font-medium mb-2'}, "Lanthanides"),
+        React.createElement('div', {className:'grid grid-flow-col gap-2 auto-cols-fr'}, lanthanides.map(e => React.createElement('div', {key: 'e' + e.atomicNumber, onClick:()=>openElement(e), className:'cell-small', style:{background:CATEGORY_COLORS[e.category]||CATEGORY_COLORS.default}}, React.createElement('div',{className:'text-xs font-semibold'}, e.symbol), React.createElement('div',{className:'text-[10px]'}, e.atomicNumber))))
+      ),
+      actinides.length > 0 && React.createElement('div', {className:'mt-3'},
+        React.createElement('div', {className:'text-sm font-medium mb-2'}, "Actinides"),
+        React.createElement('div', {className:'grid grid-flow-col gap-2 auto-cols-fr'}, actinides.map(e => React.createElement('div', {key: 'e' + e.atomicNumber, onClick:()=>openElement(e), className:'cell-small', style:{background:CATEGORY_COLORS[e.category]||CATEGORY_COLORS.default}}, React.createElement('div',{className:'text-xs font-semibold'}, e.symbol), React.createElement('div',{className:'text-[10px]'}, e.atomicNumber))))
+      )
+    )
+  );
+}
+
+/* ---------------------------
+   ElementModal
+   --------------------------- */
+function ElementModal({element, onClose, onToggleCompare, compared}) {
+  const el = element;
+  return React.createElement('div', {className:'fixed inset-0 z-50 flex items-start justify-center modal-backdrop'},
+    React.createElement('div', {className:'bg-white mt-12 p-6 rounded-lg shadow-xl w-[min(900px,95%)]'},
+      React.createElement('div', {className:'flex justify-between items-start'},
+        React.createElement('div', null,
+          React.createElement('h2', {className:'text-2xl font-bold'}, `${el.name} (${el.symbol})`),
+          React.createElement('div', {className:'text-sm text-slate-600'}, `Atomic Number: ${el.atomicNumber} • Atomic Mass: ${el.atomicMass}`)
+        ),
+        React.createElement('div', {className:'flex gap-2 items-center'},
+          React.createElement('button', {onClick:()=>onToggleCompare(el), className:`px-3 py-1 rounded ${compared? 'bg-amber-400':'bg-slate-200'}`}, compared? 'Remove from Compare' : 'Add to Compare'),
+          React.createElement('button', {onClick:onClose, className:'px-3 py-1 rounded bg-red-500 text-white'}, "Close")
+        )
+      ),
+      React.createElement('div', {className:'mt-4 grid grid-cols-2 gap-4'},
+        React.createElement('div', null,
+          React.createElement(DataRow, {label:'Category', value:el.category}),
+          React.createElement(DataRow, {label:'Phase @25°C', value:el.phase}),
+          React.createElement(DataRow, {label:'Electron configuration', value:el.electronConfiguration}),
+          React.createElement(DataRow, {label:'Oxidation states', value:(Array.isArray(el.oxidationStates)?el.oxidationStates.join(', '):(el.oxidationStates||'—'))}),
+          React.createElement(DataRow, {label:'Density (g/cm³)', value:el.density}),
+          // changed: replace nullish coalescing with compatible checks
+          React.createElement(DataRow, {label:'Melting / Boiling (°C)', value:`${(el.meltingPointC !== undefined && el.meltingPointC !== null) ? el.meltingPointC : '—'} / ${(el.boilingPointC !== undefined && el.boilingPointC !== null) ? el.boilingPointC : '—'}`}),
+        ),
+        React.createElement('div', null,
+          React.createElement(DataRow, {label:'Discovery Year', value:el.discoveryYear || 'Unknown'}),
+          React.createElement(DataRow, {label:'Discoverer', value:el.discoverer || 'Unknown'}),
+          React.createElement(DataRow, {label:'Color', value:el.color || '—'}),
+          // changed: replace nullish coalescing with compatible check
+          React.createElement(DataRow, {label:'Electronegativity', value:(el.electronegativity !== undefined && el.electronegativity !== null) ? el.electronegativity : '—'}),
+          React.createElement('div', {className:'mt-2'},
+            React.createElement('div', {className:'text-sm font-medium mb-1'}, "Fun facts & unique properties"),
+            (el.funFacts && el.funFacts.length) ? React.createElement('ul', {className:'list-disc pl-5 text-sm'}, el.funFacts.map((f,i)=>React.createElement('li',{key:i},f))) : React.createElement('div', {className:'text-sm text-slate-500'}, "No facts available.")
+          )
+        )
+      ),
+      React.createElement('div', {className:'mt-4 flex justify-end gap-2'},
+        React.createElement('button', {onClick:()=> downloadTextFile(`${el.symbol}_${el.atomicNumber}.json`, JSON.stringify(el, null, 2)), className:'px-3 py-1 rounded bg-sky-500 text-white'}, "Download JSON"),
+        React.createElement('button', {onClick:()=> downloadTextFile(`${el.symbol}_${el.atomicNumber}.txt`, [
+          `Name: ${el.name} (${el.symbol})`,
+          `Atomic Number: ${el.atomicNumber}`,
+          `Atomic Mass: ${el.atomicMass}`,
+          `Category: ${el.category}`,
+          `Discovery Year: ${el.discoveryYear || '—'}`,
+          `Discoverer: ${el.discoverer || '—'}`,
+          '',
+          'Fun facts:',
+          ...(el.funFacts||[])
+        ].join('\\n')), className:'px-3 py-1 rounded bg-slate-200'}, "Download Text")
+      )
+    )
+  );
+}
+
+function DataRow({label, value}) {
+  return React.createElement('div', {className:'flex justify-between items-start py-1 border-b border-slate-100'},
+    React.createElement('div', {className:'text-sm text-slate-600'}, label),
+    React.createElement('div', {className:'text-sm font-medium text-right'}, value)
+  );
+}
+
+/* ---------------------------
+   CompareModal
+   --------------------------- */
+function CompareModal({items, onClose}) {
+  if (!items || items.length === 0) return null;
+  const cols = ["atomicNumber","symbol","name","atomicMass","category","phase","density","meltingPointC","boilingPointC","discoveryYear","discoverer"];
+  return React.createElement('div', {className:'fixed inset-0 z-50 flex items-start justify-center modal-backdrop'},
+    React.createElement('div', {className:'bg-white mt-12 p-6 rounded-lg shadow-xl w-[min(1000px,98%)] overflow-auto'},
+      React.createElement('div', {className:'flex justify-between items-center mb-4'},
+        React.createElement('h3', {className:'text-lg font-semibold'}, "Compare Elements"),
+        React.createElement('button', {onClick:onClose, className:'px-3 py-1 rounded bg-red-500 text-white'}, "Close")
+      ),
+      React.createElement('table', {className:'w-full table-auto border-collapse'},
+        React.createElement('thead', null,
+          React.createElement('tr', null,
+            cols.map(c => React.createElement('th', {key:c, className:'text-left p-2 border-b'}, c))
+          )
+        ),
+        React.createElement('tbody', null,
+          items.map(item => React.createElement('tr', {key:item.atomicNumber},
+            // changed: avoid `??` (nullish coalescing). Use explicit null/undefined checks instead.
+            cols.map(col => React.createElement('td', {key:col, className:'p-2 align-top border-b'},
+              Array.isArray(item[col])
+                ? item[col].join('; ')
+                : ((item[col] !== undefined && item[col] !== null) ? String(item[col]) : '—')
+            ))
+          ))
+        )
+      )
+    )
+  );
+}
+
+/* ---------------------------
+   Mount app
+   --------------------------- */
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
+
+/* ---------------------------
+   Helpful notes for you (developer):
+   - To use a full dataset:
+     1) Replace `sampleElements` contents with a full array of 118 element objects.
+     2) Or put a script before this one that sets `window.ELEMENTS = [ ...full array... ]`.
+     3) Ensure each element has `discoveryYear` and `discoverer` fields if you want timeline & discovery info.
+
+   - If you want me to generate the full enriched JSON (118 elements with discoveryYear, discoverer & fun facts),
+     say so and I'll produce it as a separate downloadable JSON file.
+
+   - To persist a user's saved state across reloads, you could persist `window.localStorage` keys in the Save State action.
+
+   - Accessibility: ARIA roles for the grid and modal can be added quickly if needed.
+
+   Enjoy! 
+*/
+</script>
+</body>
+</html>
