@@ -3,39 +3,19 @@ const router = express.Router();
 const gameController = require('../controllers/gameController');
 const upload = require('../middleware/upload');
 
-/**
- * @route GET /api/games
- * @description Get all games
- * @access Public
- */
+// Listing all games
 router.get('/', gameController.getAllGames);
 
-/**
- * @route GET /api/games/search
- * @description Search games
- * @access Public
- */
+// For searching games
 router.get('/search', gameController.searchGames);
 
-/**
- * @route GET /api/games/:id
- * @description Get single game by ID
- * @access Public
- */
+// For fetching single game
 router.get('/:id', gameController.getGame);
 
-/**
- * @route GET /api/games/:id/play
- * @description Serve game (redirect to index.html)
- * @access Public
- */
+// For fetching hosted game url
 router.get('/:id/play', gameController.serveGame);
 
-/**
- * @route POST /api/games
- * @description Create new game
- * @access Public
- */
+// For uploading or createing new game
 router.post('/', 
     upload.fields([
         { name: 'thumbnail', maxCount: 1 },
@@ -44,11 +24,7 @@ router.post('/',
     gameController.createGame
 );
 
-/**
- * @route DELETE /api/games/:id
- * @description Delete game
- * @access Public
- */
+// For Deleting game
 router.delete('/:id', gameController.deleteGame);
 
 module.exports = router;
