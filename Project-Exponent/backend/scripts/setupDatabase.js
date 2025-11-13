@@ -1,87 +1,97 @@
 const { Pool } = require('pg');
 
 async function setupDatabase() {
-    console.log('🔧 Attempting database setup...');
-    
+    console.log('Setting up database...');
+
     const pool = new Pool({
-        host: process.env.DB_HOST || 'postgres',
-        port: parseInt(process.env.DB_PORT) || 5432,
+        host: process.env.DB_HOST || 'db',
+        port: parseInt(process.env.DB_PORT, 10) || 5432,
         user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'postgres',
+        password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME || 'project_exponent',
-        max: 20,
+        max: 10,
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 30000,
+        connectionTimeoutMillis: 10000,
     });
 
-    let retries = 5;
-    
+    let retries = 7;
     while (retries > 0) {
+        let client;
         try {
-            console.log(`📡 Connecting to database (attempt ${6 - retries}/5)...`);
-            
-            await pool.query('SELECT NOW()');
-            console.log('✅ Database connection successful');
+            client = await pool.connect();
+            console.log(`Connected (attempt ${8 - retries}/7)`);
 
-            await pool.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
-            console.log('✅ UUID extension enabled');
+            await client.query('SELECT NOW()');
+            console.log('DB ping OK');
 
-            await pool.query(`
+            await client.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+            console.log('UUID extension ready');
+
+            await client.query(`
                 CREATE TABLE IF NOT EXISTS games (
                     id SERIAL PRIMARY KEY,
-                    title VARCHAR(255) NOT NULL CHECK (char_length(title) > 0),
+                    title VARCHAR(255) NOT NULL CHECK (title <> ''),
                     description TEXT,
                     thumbnail_url VARCHAR(500),
-                    game_folder_url VARCHAR(500) NOT NULL,
+                    game_folder_url VARCHAR(500) NOT NULL UNIQUE,
                     original_filename VARCHAR(255) NOT NULL,
-                    file_size BIGINT CHECK (file_size > 0 AND file_size < 104857600),
+                    file_size BIGINT CHECK (file_size > 0 AND file_size <= 524288000),
                     mime_type VARCHAR(100),
                     metadata JSONB DEFAULT '{}',
+                    is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMPTZ DEFAULT NOW(),
-                    updated_at TIMESTAMPTZ DEFAULT NOW(),
-                    is_active BOOLEAN DEFAULT TRUE
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
                 )
             `);
-            console.log('✅ Games table verified');
+            console.log('Games table ready');
 
-            await pool.query(`
-                CREATE INDEX IF NOT EXISTS idx_games_created_at 
-                ON games(created_at DESC)
+            // Reset sequence
+            await client.query(`
+                DO $$
+                DECLARE max_id bigint;
+                BEGIN
+                    SELECT COALESCE(MAX(id), 0) INTO max_id FROM games;
+                    PERFORM setval(pg_get_serial_sequence('games', 'id'), max_id + 1, false);
+                END $$;
             `);
+            console.log('Serial sequence synchronized');
 
-            await pool.query(`
-                CREATE INDEX IF NOT EXISTS idx_games_active 
-                ON games(is_active) WHERE is_active = true
-            `);
-            console.log('✅ Indexes verified');
+            // Indexes
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_games_fts 
+                ON games USING GIN (to_tsvector('english', title || ' ' || COALESCE(description, ''))) 
+                WHERE is_active = true`);
+            await client.query(`CREATE INDEX IF NOT EXISTS idx_games_active_created 
+                ON games (created_at DESC) WHERE is_active = true`);
+            console.log('Indexes ready');
 
-            const result = await pool.query('SELECT COUNT(*) FROM games');
-            console.log(`📊 Database ready with ${result.rows[0].count} games`);
+            const { rows } = await client.query('SELECT COUNT(*) FROM games WHERE is_active = true');
+            console.log(`Found ${rows[0].count} active games`);
 
+            client.release();
             await pool.end();
-            console.log('🎉 Database setup completed!');
+            console.log('Database setup complete');
             return true;
 
         } catch (error) {
-            console.log(`❌ Database setup attempt failed: ${error.message}`);
             retries--;
-            
+            console.log(`Failed: ${error.message}`);
+
             if (retries === 0) {
-                console.log('💡 Database setup failed, but application will continue...');
+                console.log('Max retries reached. Starting anyway...');
+                if (client) client.release();
                 await pool.end().catch(() => {});
                 return false;
             }
-            
-            console.log(`🔄 Retrying in 5 seconds... (${retries} attempts remaining)`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            const delay = (8 - retries) * 3000;
+            console.log(`Retrying in ${delay/1000}s...`);
+            await new Promise(r => setTimeout(r, delay));
         }
     }
 }
 
 if (require.main === module) {
-    setupDatabase().then(success => {
-        process.exit(success ? 0 : 1);
-    });
+    setupDatabase().then(success => process.exit(success ? 0 : 1));
 }
 
 module.exports = setupDatabase;
