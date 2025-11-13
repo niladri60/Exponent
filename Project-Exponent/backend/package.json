@@ -1,7 +1,7 @@
 {
   "name": "project-exponent",
   "version": "1.0.0",
-  "description": "Platform for hosting Web based games",
+  "description": "Platform for hosting Web based simulation",
   "main": "app.js",
   "scripts": {
     "dev": "cross-env NODE_OPTIONS='--max-old-space-size=4096' nodemon app.js",
@@ -33,6 +33,7 @@
     "nodemon": "^3.1.10"
   },
   "engines": {
-    "node": ">=24.11.0"
-  }
+    "node": ">=20.0.0 <21.0.0"
+  },
+  "private": true
 }
