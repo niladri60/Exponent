@@ -150,22 +150,8 @@ exports.serveGame = async (req, res, next) => {
             });
         }
 
-        // Get the actual game folder path
-        const gameFolderPath = path.join(__dirname, '..', 'public', game.game_folder_url);
-        
-        // Check if index.html exists
-        const indexPath = path.join(gameFolderPath, 'index.html');
-        if (!await fs.pathExists(indexPath)) {
-            return res.status(404).json({
-                success: false,
-                message: 'Game index.html not found'
-            });
-        }
-
-        console.log('🎮 Serving game from:', gameFolderPath);
-        
-        // Serve the HTML file directly instead of redirecting
-        res.sendFile(indexPath);
+        const gameUrl = `${game.game_folder_url}/index.html`;
+        res.redirect(gameUrl);
 
     } catch (error) {
         console.error('Error serving game:', error);
