@@ -1,0 +1,4 @@
+mkdir -p public/games public/thumbnails temp/uploads
+touch public/games/.gitkeep
+touch public/thumbnails/.gitkeep
+touch temp/uploads/.gitkeep
