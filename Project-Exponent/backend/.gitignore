@@ -23,6 +23,7 @@ pids
 coverage/
 
 # Temporary folders
+public/
 temp/
 uploads/
 
